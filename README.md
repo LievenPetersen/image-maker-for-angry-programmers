@@ -4,7 +4,6 @@
 
 
 - Image is always saved as `out.png`
-- fixed size to 8x8 for now
 
 - raylib + raygui
 - requires raylib installation (4 or 5 should be fine) (`sudo make install` in raylib/src)

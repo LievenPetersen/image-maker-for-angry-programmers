@@ -1,6 +1,6 @@
 #include <assert.h>
+#include <stdlib.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
 
 #include <raylib.h>
@@ -9,8 +9,10 @@
 #include <raymath.h>
 
 #define MIN(a, b) (a<b? (a) : (b))
+#define MAX(a, b) (a>b? (a) : (b))
 
 #define FAV_COLOR ((Color){0x18, 0x18, 0x18, 0xFF}) // sorry, but AA is a bit impractical
+#define STD_COLOR ((Color){0xFF, 0x00, 0x00, 0xFF})
 
 bool save_texture_as_image(Texture2D tex, const char *path){
     Image result = LoadImageFromTexture(tex);
@@ -27,7 +29,74 @@ bool save_texture_as_image(Texture2D tex, const char *path){
     return success;
 }
 
+// returns > 0  on resize
+long dimension_text_box(const Rectangle bounds, char *str_value, const size_t str_size, long reset_value, bool *isEditing){
+    long result = -1;
+    if (GuiTextBox(bounds, str_value, str_size, *isEditing)){
+        *isEditing = !*isEditing;
+        if (!*isEditing){
+            char *endptr;
+            long value = strtol(str_value, &endptr, 10);
+            bool parsed_entirely = *endptr == 0;
+            if(parsed_entirely && value > 0){
+                result = value;
+            } else {
+                printf("entered invalid value for x resize!\n");
+                sprintf(str_value, "%ld", reset_value);
+                // TODO: show error
+            }
+        }
+    }
+    return result;
+}
+
+// changes image and texture to PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
+Texture2D loadImageAsTexture(Image *img){
+    ImageFormat(img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Texture2D buffer = LoadTextureFromImage(*img);
+    assert(buffer.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    return buffer;
+}
+
+bool setTextureToImage(Texture2D *texture, Image *img){
+    Texture2D new_buffer = loadImageAsTexture(img);
+    if (!IsTextureReady(new_buffer)){
+        UnloadTexture(new_buffer);
+        // TODO: fail operation
+        return false;
+    } else {
+        UnloadTexture(*texture);
+        *texture = new_buffer;
+        return true;
+    }
+}
+
+// fill color for resize is not implemented yet in raylib, so do it here.
+void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color fill){  // Resize canvas and fill with color
+    int oldWidth = image->width;
+    int oldHeight = image->height;
+    ImageResizeCanvas(image, newWidth, newHeight, offsetX, offsetY, fill);
+    // fill new pixels with color
+    // filling order around old image (o):
+    // 111
+    // 3o4
+    // 222
+    if (offsetY > 0){
+        ImageDrawRectangle(image, 0, 0, newWidth, offsetY, fill);
+    }
+    if (offsetY + oldHeight < newHeight){
+        ImageDrawRectangle(image, 0, offsetY + oldHeight, newWidth, newHeight - offsetY - oldHeight, fill);
+    }
+    if (offsetX > 0){
+        ImageDrawRectangle(image, 0, offsetY, offsetY, oldHeight, fill);
+    }
+    if (offsetX + oldWidth < newWidth){
+        ImageDrawRectangle(image, offsetX + oldWidth, offsetY, newWidth - offsetX - oldWidth, oldHeight, fill);
+    }
+}
+
 int main(){
+    // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 800, "Image maker for angry programmers");
     SetTargetFPS(60);
@@ -37,12 +106,16 @@ int main(){
     DrawText(loading_text, (GetScreenWidth()-MeasureText(loading_text, loadingFontSize))/2, GetScreenHeight()/2, loadingFontSize, WHITE);
     EndDrawing();
 
-    const size_t DIM_SIZE = 10;
-    char x_field[DIM_SIZE];
-    char y_field[DIM_SIZE];
+    // initialize application
+    Vector2 image_size = {8, 8};
+
+    const size_t DIM_STRLEN = 4; // TODO: support 4 digit sizes
+    char x_field[DIM_STRLEN];
+    char y_field[DIM_STRLEN];
+    sprintf(x_field, "%d", (int)image_size.x);
+    sprintf(y_field, "%d", (int)image_size.y);
+
     char hex_field[11];
-    sprintf(x_field, "10");
-    sprintf(y_field, "10");
 
     int menu_font_size = 30;
     int menu_width = 200;
@@ -71,27 +144,31 @@ int main(){
 
 
     bool hasImage = false;
-    bool forceResize = true;
+    bool forceWindowResize = true;
 
     bool showGrid = true;
-    bool isEditingHexField = false;
 
-    Image img;
+    // track if any text box is being edited.
+    bool isEditingHexField = false;
+    bool isEditingXField = false;
+    bool isEditingYField = false;
+
     Texture2D buffer;
-    float scale = 20;
-    Rectangle drawingBounds = {0, 0, GetScreenWidth(), GetScreenHeight()};
-    Vector2 image_size = {8, 8};
+    float scale;
     Vector2 position;
+
+    Rectangle drawingBounds = {0, 0, GetScreenWidth(), GetScreenHeight()};
     Color active_color = FAV_COLOR;
 
     sprintf(hex_field, "%02X%02X%02X%02X", active_color.r, active_color.g, active_color.b, active_color.a);
 
     while(!WindowShouldClose()){
-        if (IsWindowResized() || forceResize){
-            forceResize = false;
+        if (IsWindowResized() || forceWindowResize){
+            forceWindowResize = false;
             drawingBounds = (Rectangle){menu_width, 0, GetScreenWidth()-menu_width, GetScreenHeight()};
             if (hasImage){
-                scale = floor(MIN(drawingBounds.width / image_size.x, drawingBounds.height / image_size.y));
+                // TODO support images bigger than drawingBounds
+                scale = MAX(1.0f, floor(MIN(drawingBounds.width / image_size.x, drawingBounds.height / image_size.y)));
                 position = (Vector2){drawingBounds.width - image_size.x*scale, drawingBounds.height - image_size.y*scale};
                 position = Vector2Scale(position, 0.5);
                 position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, position);
@@ -115,14 +192,11 @@ int main(){
         ClearBackground(FAV_COLOR);
     
         if (!hasImage){
-            Color background_color = (Color){0xFF, 0, 0, 0xFF};
-            img = GenImageColor(image_size.x, image_size.y, background_color);
-            scale = floor(MIN(drawingBounds.width / image_size.x, drawingBounds.height / image_size.y));
-            ImageFormat(&img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-            buffer = LoadTextureFromImage(img);
-            assert(buffer.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+            Image img = GenImageColor(image_size.x, image_size.y, STD_COLOR);
+            buffer = loadImageAsTexture(&img);
+            UnloadImage(img);
             hasImage = true;
-            forceResize = true;
+            forceWindowResize = true;
         }
         DrawTextureEx(buffer, position, 0, scale, WHITE);
 
@@ -139,15 +213,15 @@ int main(){
         // draw menu
         DrawLine(menu_width, 0, menu_width, GetScreenHeight(), GRAY);
 
+        // color picker
         int color_picker_y = 50;
         int color_picker_size = menu_content_width - huebar_width - huebar_padding;
         GuiColorPicker((Rectangle){menu_padding, color_picker_y, color_picker_size, color_picker_size}, "heyyyy", &active_color);
-
         if (!isEditingHexField){
             sprintf(hex_field, "%02X%02X%02X%02X", active_color.r, active_color.g, active_color.b, active_color.a);
         }
 
-
+        // hex code text box
         Rectangle hex_box = {menu_padding, color_picker_size + color_picker_y + huebar_padding, menu_content_width, menu_font_size};
         if(GuiTextBox(hex_box, hex_field, 9, isEditingHexField)){
             isEditingHexField = !isEditingHexField;
@@ -172,15 +246,43 @@ int main(){
 
         int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size + 20;
 
+        // grid checkbox
         GuiCheckBox((Rectangle){menu_padding, options_y + 0*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
 
+        // x resize textbox
+        Rectangle x_box = {menu_padding, options_y + 1*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+        long res = dimension_text_box(x_box, x_field, DIM_STRLEN, image_size.x, &isEditingXField);
+        if (res > 0){
+            // TODO: fix flicker on resize? (caused by unloading the currently drawn texture)
+            image_size.x = res;
+            forceWindowResize = true;
+            Image img = LoadImageFromTexture(buffer);
+            ImageResizeCanvasOwn(&img, image_size.x, image_size.y, 0, 0, STD_COLOR);
+            setTextureToImage(&buffer, &img);
+            UnloadImage(img);
+        }
+        DrawText("x", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + 1*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+
+        // y resize textbox
+        Rectangle y_box = {menu_padding, options_y + 2*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+        res = dimension_text_box(y_box, y_field, DIM_STRLEN, image_size.y, &isEditingYField);
+        if (res > 0){
+            image_size.y = res;
+            forceWindowResize = true;
+            Image img = LoadImageFromTexture(buffer);
+            ImageResizeCanvasOwn(&img, image_size.x, image_size.y, 0, 0, STD_COLOR);
+            setTextureToImage(&buffer, &img);
+            UnloadImage(img);
+        }
+        DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + 2*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+
+        // save button
         if(GuiButton((Rectangle){menu_padding, GetScreenHeight() - menu_padding - menu_font_size-5, menu_content_width, menu_font_size+5}, "save (s)")){
             save_texture_as_image(buffer, file_path);
         }
         EndDrawing();
     }
 
-    UnloadImage(img);
     UnloadTexture(buffer);
     CloseWindow();
 }
