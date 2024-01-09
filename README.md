@@ -1,10 +1,20 @@
 # primitive pixel art tool
-`make` or `make run` or `cc main.c -lraylib -lm`
+- to build: `make` or `cc main.c -lraylib -lm`
+- to build & run: `make run`
 
-Image is always saved as `out.png`
+
+- Image is always saved as `out.png`
+- fixed size to 8x8 for now
 
 - raylib + raygui
 - requires raylib installation (4 or 5 should be fine) (`sudo make install` in raylib/src)
-- fixed size to 8x8 for now
+
+
+## preconfigured for ease of use:
 
 ![a screenshot showing the default configuration](screenshot.png?raw=true)
+
+## why?
+
+[trying to ease the suffering](https://youtu.be/K7hWqxC_7Mw?t=6303)
+
