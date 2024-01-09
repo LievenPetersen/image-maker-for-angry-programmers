@@ -1,2 +1,5 @@
 main
-out.png
+
+# ignore all images, with specific exceptions
+**.png
+!screenshot.png
