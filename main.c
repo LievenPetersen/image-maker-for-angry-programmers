@@ -128,6 +128,7 @@ int main(){
     char *file_path = "out.png";
 
     GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
+    GuiSetStyle(DEFAULT, TEXT_SPACING, 3);
 
     GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, 0xFFFFFFFF);
     GuiSetStyle(DEFAULT, TEXT_COLOR_FOCUSED, 0xDDDDDDFF);
@@ -214,7 +215,7 @@ int main(){
         DrawLine(menu_width, 0, menu_width, GetScreenHeight(), GRAY);
 
         // color picker
-        int color_picker_y = 50;
+        int color_picker_y = menu_padding;
         int color_picker_size = menu_content_width - huebar_width - huebar_padding;
         GuiColorPicker((Rectangle){menu_padding, color_picker_y, color_picker_size, color_picker_size}, "heyyyy", &active_color);
         if (!isEditingHexField){
