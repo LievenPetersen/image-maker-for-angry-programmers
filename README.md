@@ -1,12 +1,14 @@
 # primitive pixel art tool
-- to build: `make` or `cc main.c -lraylib -lm`
-- to build & run: `make run`
-
-
-- Image is always saved as `out.png`
-
 - raylib + raygui
 - requires raylib installation (4 or 5 should be fine) (`sudo make install` in raylib/src)
+- to build: `make` or `cc -o main main.c -lraylib -lm` then `./main`
+- to build & run: `make run`
+
+---
+
+- Image is always saved as `out.png`
+- can load image given as command line argument (still saves to `out.png`)
+
 
 
 ## preconfigured for ease of use:

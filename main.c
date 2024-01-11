@@ -95,7 +95,8 @@ void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX
     }
 }
 
-int main(){
+int main(int argc, char **argv){
+
     // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 800, "Image maker for angry programmers");
@@ -106,9 +107,38 @@ int main(){
     DrawText(loading_text, (GetScreenWidth()-MeasureText(loading_text, loadingFontSize))/2, GetScreenHeight()/2, loadingFontSize, WHITE);
     EndDrawing();
 
-    // initialize application
-    Vector2 image_size = {8, 8};
+    // -- initialize application --
 
+    Texture2D buffer = {0};
+    Vector2 image_size = {0};
+    bool hasImage = false;
+
+    // load image from provided path
+    if (argc == 2){
+        Image img = LoadImage(argv[1]);
+        if (!IsImageReady(img)){
+            printf("Error: failed to load image from '%s'\n", argv[1]);
+            UnloadImage(img);
+            return 1;
+        }
+        buffer = loadImageAsTexture(&img);
+        image_size.x = img.width;
+        image_size.y = img.height;
+
+        hasImage = true;
+        UnloadImage(img);
+    }
+
+    // generate standard 8x8 image
+    if (!hasImage){
+        image_size = (Vector2){8, 8};
+        Image img = GenImageColor(image_size.x, image_size.y, STD_COLOR);
+        buffer = loadImageAsTexture(&img);
+        UnloadImage(img);
+        hasImage = true;
+    }
+
+    // strings for image resizing textBoxes
     const size_t DIM_STRLEN = 4; // TODO: support 4 digit sizes
     char x_field[DIM_STRLEN];
     char y_field[DIM_STRLEN];
@@ -117,6 +147,12 @@ int main(){
 
     char hex_field[11];
 
+    // track if any text box is being edited.
+    bool isEditingHexField = false;
+    bool isEditingXField = false;
+    bool isEditingYField = false;
+
+    // menu parameters
     int menu_font_size = 30;
     int menu_width = 200;
     int menu_padding = 20;
@@ -127,6 +163,7 @@ int main(){
 
     char *file_path = "out.png";
 
+    // raygui style settings
     GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
     GuiSetStyle(DEFAULT, TEXT_SPACING, 3);
 
@@ -144,24 +181,15 @@ int main(){
     GuiSetStyle(DEFAULT, BACKGROUND_COLOR, 0x181818FF);
 
 
-    bool hasImage = false;
     bool forceWindowResize = true;
-
     bool showGrid = true;
 
-    // track if any text box is being edited.
-    bool isEditingHexField = false;
-    bool isEditingXField = false;
-    bool isEditingYField = false;
-
-    Texture2D buffer;
-    float scale;
-    Vector2 position;
+    float scale = 0;
+    Vector2 position = {0};
 
     Rectangle drawingBounds = {0, 0, GetScreenWidth(), GetScreenHeight()};
-    Color active_color = FAV_COLOR;
 
-    sprintf(hex_field, "%02X%02X%02X%02X", active_color.r, active_color.g, active_color.b, active_color.a);
+    Color active_color = FAV_COLOR;
 
     while(!WindowShouldClose()){
         if (IsWindowResized() || forceWindowResize){
@@ -191,14 +219,8 @@ int main(){
 
         BeginDrawing();
         ClearBackground(FAV_COLOR);
-    
-        if (!hasImage){
-            Image img = GenImageColor(image_size.x, image_size.y, STD_COLOR);
-            buffer = loadImageAsTexture(&img);
-            UnloadImage(img);
-            hasImage = true;
-            forceWindowResize = true;
-        }
+
+        // draw image
         DrawTextureEx(buffer, position, 0, scale, WHITE);
 
         // draw grid
