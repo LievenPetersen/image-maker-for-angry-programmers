@@ -312,7 +312,7 @@ int main(int argc, char **argv){
         int item = 0;
 
         // pipette
-        Rectangle pipette_box = {menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_content_width, menu_font_size};
+        Rectangle pipette_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         if(GuiButton(pipette_box, "pipette")){
             if (cursor != CURSOR_PIPETTE) cursor = CURSOR_PIPETTE;
             else cursor = CURSOR_DEFAULT;
@@ -320,6 +320,8 @@ int main(int argc, char **argv){
         if (cursor == CURSOR_PIPETTE){
             DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
         }
+        // TODO: icon should scale with font size.
+        GuiDrawIcon(27, menu_padding + menu_content_width - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size), 2, WHITE);
 
         item++;
 
@@ -354,7 +356,9 @@ int main(int argc, char **argv){
         DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
 
         // save button
-        if(GuiButton((Rectangle){menu_padding, GetScreenHeight() - menu_padding - menu_font_size-5, menu_content_width, menu_font_size+5}, "save (s)")){
+        int min_y = options_y + item*(huebar_padding+menu_font_size);
+        int desired_y = GetScreenHeight() - menu_padding - menu_font_size-5;
+        if(GuiButton((Rectangle){menu_padding, MAX(min_y, desired_y), menu_content_width, menu_font_size+5}, "save (s)")){
             save_texture_as_image(buffer, file_path);
         }
         EndDrawing();
