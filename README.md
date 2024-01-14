@@ -1,14 +1,14 @@
 # primitive pixel art tool
-- raylib + raygui
-- requires raylib installation (4 or 5 should be fine) (`sudo make install` in raylib/src)
-- to build: `make` or `cc -o main main.c -lraylib -lm` then `./main`
-- to build & run: `make run`
+- uses raylib + raygui
+- to build:
+  - `make` build with provided raylib version.
+  - use `make build_from_global` to use globally installed raylib version.
+- to run: `make run` or `./main`
 
 ---
 
 - Image is always saved as `out.png`
-- can load image given as command line argument (still saves to `out.png`)
-
+- can load image that is given as command line argument (still saves to `out.png`)
 
 
 ## preconfigured for ease of use:

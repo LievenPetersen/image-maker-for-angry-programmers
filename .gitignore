@@ -3,3 +3,5 @@ main
 # ignore all images, with specific exceptions
 **.png
 !screenshot.png
+
+*.o

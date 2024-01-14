@@ -2,11 +2,13 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
-#include <raylib.h>
+#include "external/raylib/src/raylib.h"
+#include "external/raylib/src/raymath.h"
+
 #define RAYGUI_IMPLEMENTATION
-#include "raygui.h"
-#include <raymath.h>
+#include "external/raygui.h"
 
 #define MIN(a, b) (a<b? (a) : (b))
 #define MAX(a, b) (a>b? (a) : (b))
@@ -76,22 +78,22 @@ void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX
     int oldWidth = image->width;
     int oldHeight = image->height;
     ImageResizeCanvas(image, newWidth, newHeight, offsetX, offsetY, fill);
-    // fill new pixels with color
-    // filling order around old image (o):
-    // 111
-    // 3o4
-    // 222
-    if (offsetY > 0){
-        ImageDrawRectangle(image, 0, 0, newWidth, offsetY, fill);
-    }
-    if (offsetY + oldHeight < newHeight){
-        ImageDrawRectangle(image, 0, offsetY + oldHeight, newWidth, newHeight - offsetY - oldHeight, fill);
-    }
-    if (offsetX > 0){
-        ImageDrawRectangle(image, 0, offsetY, offsetY, oldHeight, fill);
-    }
-    if (offsetX + oldWidth < newWidth){
-        ImageDrawRectangle(image, offsetX + oldWidth, offsetY, newWidth - offsetX - oldWidth, oldHeight, fill);
+
+    // Fill color for ImageResizeCanvas was not implemented until RAYLIB_VERSION "5.1-dev", pull request #3720.
+    // Thus prior versions need to fill the canvas manually.
+    if (RAYLIB_VERSION_MAJOR < 5 || (RAYLIB_VERSION_MAJOR == 5 && RAYLIB_VERSION_MINOR < 1) || strcmp(RAYLIB_VERSION, "5.1-dev")){
+        if (offsetY > 0){
+            ImageDrawRectangle(image, 0, 0, newWidth, offsetY, fill);
+        }
+        if (offsetY + oldHeight < newHeight){
+            ImageDrawRectangle(image, 0, offsetY + oldHeight, newWidth, newHeight - offsetY - oldHeight, fill);
+        }
+        if (offsetX > 0){
+            ImageDrawRectangle(image, 0, offsetY, offsetY, oldHeight, fill);
+        }
+        if (offsetX + oldWidth < newWidth){
+            ImageDrawRectangle(image, offsetX + oldWidth, offsetY, newWidth - offsetX - oldWidth, oldHeight, fill);
+        }
     }
 }
 
