@@ -10,11 +10,18 @@
 #define RAYGUI_IMPLEMENTATION
 #include "external/raygui.h"
 
+
 #define MIN(a, b) (a<b? (a) : (b))
 #define MAX(a, b) (a>b? (a) : (b))
 
 #define FAV_COLOR ((Color){0x18, 0x18, 0x18, 0xFF}) // sorry, but AA is a bit impractical
 #define STD_COLOR ((Color){0xFF, 0x00, 0x00, 0xFF})
+
+
+enum CURSOR_MODE{
+    CURSOR_DEFAULT,
+    CURSOR_PIPETTE,
+};
 
 bool save_texture_as_image(Texture2D tex, const char *path){
     Image result = LoadImageFromTexture(tex);
@@ -192,6 +199,7 @@ int main(int argc, char **argv){
     Rectangle drawingBounds = {0, 0, GetScreenWidth(), GetScreenHeight()};
 
     Color active_color = FAV_COLOR;
+    enum CURSOR_MODE cursor = CURSOR_DEFAULT;
 
     while(!WindowShouldClose()){
         if (IsWindowResized() || forceWindowResize){
@@ -206,11 +214,19 @@ int main(int argc, char **argv){
             }
         }
         if (hasImage){
-            // set pixel
+            // detect canvas click
             Rectangle image_bounds = {position.x, position.y, image_size.x*scale, image_size.y*scale};
             if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1/scale);
-                UpdateTextureRec(buffer, (Rectangle){pixel.x, pixel.y, 1, 1}, &active_color);
+                // set pixel
+                if (cursor == CURSOR_DEFAULT) UpdateTextureRec(buffer, (Rectangle){pixel.x, pixel.y, 1, 1}, &active_color);
+                // pick color with pipette (only on press, not continuously)
+                if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    cursor = CURSOR_DEFAULT;
+                    Image canvas_content = LoadImageFromTexture(buffer); // canvas content could be loaded as soon as pipette mode activates, if responsiveness is an issue.
+                    active_color = GetImageColor(canvas_content, pixel.x, pixel.y);
+                    UnloadImage(canvas_content);
+                }
             }
             // shortcuts
             if (!isEditingHexField){
@@ -269,13 +285,27 @@ int main(int argc, char **argv){
             }
         }
 
-        int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size + 20;
+        int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size;
+
+        int item = 0;
+
+        // pipette
+        Rectangle pipette_box = {menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_content_width, menu_font_size};
+        if(GuiButton(pipette_box, "pipette")){
+            if (cursor != CURSOR_PIPETTE) cursor = CURSOR_PIPETTE;
+            else cursor = CURSOR_DEFAULT;
+        }
+        if (cursor == CURSOR_PIPETTE){
+            DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
+        }
+
+        item++;
 
         // grid checkbox
-        GuiCheckBox((Rectangle){menu_padding, options_y + 0*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
+        GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
 
         // x resize textbox
-        Rectangle x_box = {menu_padding, options_y + 1*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+        Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         long res = dimension_text_box(x_box, x_field, DIM_STRLEN, image_size.x, &isEditingXField);
         if (res > 0){
             // TODO: fix flicker on resize? (caused by unloading the currently drawn texture)
@@ -286,10 +316,10 @@ int main(int argc, char **argv){
             setTextureToImage(&buffer, &img);
             UnloadImage(img);
         }
-        DrawText("x", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + 1*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+        DrawText("x", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
 
         // y resize textbox
-        Rectangle y_box = {menu_padding, options_y + 2*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+        Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         res = dimension_text_box(y_box, y_field, DIM_STRLEN, image_size.y, &isEditingYField);
         if (res > 0){
             image_size.y = res;
@@ -299,7 +329,7 @@ int main(int argc, char **argv){
             setTextureToImage(&buffer, &img);
             UnloadImage(img);
         }
-        DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + 2*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+        DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
 
         // save button
         if(GuiButton((Rectangle){menu_padding, GetScreenHeight() - menu_padding - menu_font_size-5, menu_content_width, menu_font_size+5}, "save (s)")){
