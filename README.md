@@ -7,8 +7,8 @@
 
 ---
 
-- Image is always saved as `out.png`
-- can load image that is given as command line argument (still saves to `out.png`)
+- supported formats: `.png` `.bmp` `.qoi` `.raw (rgba)`
+- can load image from command line argument
 
 
 ## preconfigured for ease of use:

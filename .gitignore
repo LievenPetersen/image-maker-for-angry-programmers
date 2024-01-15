@@ -4,6 +4,9 @@ main
 
 # ignore all images, with specific exceptions
 **.png
+**.bmp
+**.qoi
+**.raw
 !screenshot.png
 
 *.o

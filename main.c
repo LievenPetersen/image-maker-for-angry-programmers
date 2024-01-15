@@ -10,6 +10,7 @@
 #define RAYGUI_IMPLEMENTATION
 #include "external/raygui.h"
 
+#define MAX_NAME_FIELD_SIZE 200
 
 #define MIN(a, b) (a<b? (a) : (b))
 #define MAX(a, b) (a>b? (a) : (b))
@@ -26,8 +27,7 @@ enum CURSOR_MODE{
 bool save_texture_as_image(Texture2D tex, const char *path){
     Image result = LoadImageFromTexture(tex);
 
-    bool success = 
-        IsImageReady(result)
+    bool success = IsImageReady(result)
         && ExportImage(result, path);
 
     UnloadImage(result);
@@ -36,6 +36,11 @@ bool save_texture_as_image(Texture2D tex, const char *path){
         printf("Error while saving image!\n");
     }
     return success;
+}
+
+bool IsSupportedImageFormat(const char *filePath){
+    const char *VALID_EXTENSIONS = ".png;.bmp;.qoi;.raw"; //.tga;.jpg;.jpeg"; // .tga and .jpg don't work for some reason
+    return IsFileExtension(filePath, VALID_EXTENSIONS);
 }
 
 // returns > 0  on resize
@@ -110,6 +115,12 @@ Color HSVToColor(Vector3 hsv, unsigned char alpha){
     return color;
 }
 
+void SetWindowTitleImage(const char *image_path){
+    char title[MAX_NAME_FIELD_SIZE + 100];
+    sprintf(title, "%s - Image maker for angry programmers", image_path);
+    SetWindowTitle(title);
+}
+
 int main(int argc, char **argv){
 
     // draw loading screen
@@ -128,6 +139,9 @@ int main(int argc, char **argv){
     Vector2 image_size = {0};
     bool hasImage = false;
 
+    char name_field[MAX_NAME_FIELD_SIZE];
+    char name_field_old[MAX_NAME_FIELD_SIZE];
+
     // load image from provided path
     if (argc == 2){
         Image img = LoadImage(argv[1]);
@@ -139,6 +153,12 @@ int main(int argc, char **argv){
         buffer = loadImageAsTexture(&img);
         image_size.x = img.width;
         image_size.y = img.height;
+        if (strnlen(argv[1], MAX_NAME_FIELD_SIZE) == MAX_NAME_FIELD_SIZE){
+            name_field[MAX_NAME_FIELD_SIZE-1] = 0; // brutal approach to make string fit.
+            // TODO: more graceful solution, that doesn't rip out the postfix.
+        }
+        sprintf(name_field, "%s", argv[1]);
+        SetWindowTitleImage(name_field);
 
         hasImage = true;
         UnloadImage(img);
@@ -149,9 +169,12 @@ int main(int argc, char **argv){
         image_size = (Vector2){8, 8};
         Image img = GenImageColor(image_size.x, image_size.y, STD_COLOR);
         buffer = loadImageAsTexture(&img);
-        UnloadImage(img);
+        sprintf(name_field, "out.png");
+
         hasImage = true;
+        UnloadImage(img);
     }
+    sprintf(name_field_old, "%s", name_field);
 
     // strings for image resizing textBoxes
     const size_t DIM_STRLEN = 4; // TODO: support 4 digit sizes
@@ -166,6 +189,7 @@ int main(int argc, char **argv){
     bool isEditingHexField = false;
     bool isEditingXField = false;
     bool isEditingYField = false;
+    bool isEditingNameField = false;
 
     // menu parameters
     int menu_font_size = 30;
@@ -175,8 +199,6 @@ int main(int argc, char **argv){
 
     int huebar_padding = GuiGetStyle(COLORPICKER, HUEBAR_PADDING);
     int huebar_width = GuiGetStyle(COLORPICKER, HUEBAR_WIDTH);
-
-    char *file_path = "out.png";
 
     // raygui style settings
     GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
@@ -222,7 +244,8 @@ int main(int argc, char **argv){
                 position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, position);
             }
         }
-        if (hasImage){
+        // name field can overlap with the canvas
+        if (hasImage && !isEditingNameField){
             // detect canvas click
             Rectangle image_bounds = {position.x, position.y, image_size.x*scale, image_size.y*scale};
             if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
@@ -244,7 +267,7 @@ int main(int argc, char **argv){
             }
             // shortcuts
             if (!isEditingHexField){
-                if(IsKeyPressed(KEY_S)) save_texture_as_image(buffer, file_path);
+                if(IsKeyPressed(KEY_S)) save_texture_as_image(buffer, name_field);
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
             }
         }
@@ -355,12 +378,42 @@ int main(int argc, char **argv){
         }
         DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
 
-        // save button
+        // lower menu
         int min_y = options_y + item*(huebar_padding+menu_font_size);
-        int desired_y = GetScreenHeight() - menu_padding - menu_font_size-5;
-        if(GuiButton((Rectangle){menu_padding, MAX(min_y, desired_y), menu_content_width, menu_font_size+5}, "save (s)")){
-            save_texture_as_image(buffer, file_path);
+        int save_button_height = menu_font_size/6*7; // slightly higher, so that parentheses fit in the box.
+
+        // file name
+        int desired_text_box_y = GetScreenHeight() - menu_padding - huebar_padding - menu_font_size - save_button_height;
+        int name_width = menu_content_width;
+        if (isEditingNameField){
+            int needed_width = MeasureText(name_field, menu_font_size) + menu_font_size;
+            name_width = MAX(name_width, needed_width);
+            name_width = MIN(name_width, GetScreenWidth() - 2*menu_padding);
+
+            DrawText(".png .bmp .qoi .raw", menu_padding, MAX(min_y, desired_text_box_y) - 0.6*menu_font_size, 0.6*menu_font_size, STD_COLOR);
         }
+        if(GuiTextBox((Rectangle){menu_padding, MAX(min_y, desired_text_box_y), name_width, menu_font_size}, name_field, MAX_NAME_FIELD_SIZE, isEditingNameField)){
+            isEditingNameField = !isEditingNameField;
+            // validate
+            if (!isEditingNameField){
+                if (IsSupportedImageFormat(name_field) 
+                    && DirectoryExists(GetDirectoryPath(name_field))){
+                    // accept new name
+                        memcpy(name_field_old, name_field, strlen(name_field)+1);
+                        SetWindowTitleImage(name_field);
+                } else {
+                    // reject name: reset to old name
+                    memcpy(name_field, name_field_old, strlen(name_field_old)+1);
+                }
+            }
+        }
+
+        // save button
+        int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
+        if(GuiButton((Rectangle){menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height}, "save (s)")){
+            save_texture_as_image(buffer, name_field);
+        }
+
         EndDrawing();
     }
 
