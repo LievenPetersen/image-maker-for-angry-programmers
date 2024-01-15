@@ -1,6 +1,11 @@
 .clangd
 
-main
+# executables
+imfap
+**.exe
+
+# build artifacts
+*.o
 
 # ignore all images, with specific exceptions
 **.png
@@ -8,5 +13,3 @@ main
 **.qoi
 **.raw
 !screenshot.png
-
-*.o

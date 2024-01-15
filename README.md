@@ -3,7 +3,7 @@
 - to build:
   - `make` build with provided raylib version.
   - use `make build_from_global` to use globally installed raylib version.
-- to run: `make run` or `./main`
+- to run: `make run` or `./imfap`
 
 ---
 
