@@ -130,8 +130,8 @@ int main(int argc, char **argv){
 
     // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    SetExitKey(KEY_NULL); // disable exit on KEY_ESCAPE;
     InitWindow(1000, 800, "Image maker for angry programmers");
+    SetExitKey(KEY_NULL); // disable exit on KEY_ESCAPE;
     SetTargetFPS(60);
 
     BeginDrawing();
