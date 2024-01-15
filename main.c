@@ -125,8 +125,10 @@ int main(int argc, char **argv){
 
     // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetExitKey(KEY_NULL); // disable exit on KEY_ESCAPE;
     InitWindow(1000, 800, "Image maker for angry programmers");
     SetTargetFPS(60);
+
     BeginDrawing();
     char *loading_text = "loading...";
     int loadingFontSize = 20;
