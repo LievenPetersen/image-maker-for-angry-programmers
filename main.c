@@ -274,7 +274,7 @@ int main(int argc, char **argv){
             }
             // shortcuts
             if (!isEditingHexField){
-                if(IsKeyPressed(KEY_S)) save_texture_as_image(buffer, name_field);
+                if(IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL))) save_texture_as_image(buffer, name_field);
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
                 if(IsKeyPressed(KEY_P)) togglePipette(&cursor);
             }
@@ -417,7 +417,9 @@ int main(int argc, char **argv){
 
         // save button
         int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
-        if(GuiButton((Rectangle){menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height}, "save (s)")){
+        Rectangle save_rect = {menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
+        if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawText("ctrl+s", menu_width, save_rect.y + (save_rect.height - menu_font_size)/2, menu_font_size, WHITE);
+        if(GuiButton(save_rect, "save")){
             save_texture_as_image(buffer, name_field);
         }
 
