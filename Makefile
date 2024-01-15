@@ -38,7 +38,11 @@ RAY_OBJS = $(RAY_SRCS:c=o)
 all: build
 
 run: build
+ifeq ($(TARGET), Windows)
+	wine $(OUTPUT)
+else
 	./$(OUTPUT)
+endif
 
 # build from globally installed raylib library
 build_from_global: $(SRCS)
