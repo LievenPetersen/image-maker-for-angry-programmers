@@ -121,6 +121,11 @@ void SetWindowTitleImage(const char *image_path){
     SetWindowTitle(title);
 }
 
+void togglePipette(enum CURSOR_MODE *cursor){
+    if (*cursor != CURSOR_PIPETTE) *cursor = CURSOR_PIPETTE;
+    else *cursor = CURSOR_DEFAULT;
+}
+
 int main(int argc, char **argv){
 
     // draw loading screen
@@ -271,6 +276,7 @@ int main(int argc, char **argv){
             if (!isEditingHexField){
                 if(IsKeyPressed(KEY_S)) save_texture_as_image(buffer, name_field);
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
+                if(IsKeyPressed(KEY_P)) togglePipette(&cursor);
             }
         }
 
@@ -339,8 +345,7 @@ int main(int argc, char **argv){
         // pipette
         Rectangle pipette_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         if(GuiButton(pipette_box, "pipette")){
-            if (cursor != CURSOR_PIPETTE) cursor = CURSOR_PIPETTE;
-            else cursor = CURSOR_DEFAULT;
+            togglePipette(&cursor);
         }
         if (cursor == CURSOR_PIPETTE){
             DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
