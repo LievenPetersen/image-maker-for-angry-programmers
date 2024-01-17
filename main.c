@@ -22,6 +22,7 @@
 enum CURSOR_MODE{
     CURSOR_DEFAULT,
     CURSOR_PIPETTE,
+    CURSOR_COLOR_FILL,
 };
 
 bool save_texture_as_image(Texture2D tex, const char *path){
@@ -72,6 +73,7 @@ Texture2D loadImageAsTexture(Image *img){
     return buffer;
 }
 
+// replaces the existing texture and unloads it. Returns true on success.
 bool setTextureToImage(Texture2D *texture, Image *img){
     Texture2D new_buffer = loadImageAsTexture(img);
     if (!IsTextureReady(new_buffer)){
@@ -125,6 +127,85 @@ void togglePipette(enum CURSOR_MODE *cursor){
     if (*cursor != CURSOR_PIPETTE) *cursor = CURSOR_PIPETTE;
     else *cursor = CURSOR_DEFAULT;
 }
+
+void toggleColorFill(enum CURSOR_MODE *cursor){
+    if (*cursor != CURSOR_COLOR_FILL) *cursor = CURSOR_COLOR_FILL;
+    else *cursor = CURSOR_DEFAULT;
+}
+
+void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
+    Color old_color = GetImageColor(*image, source_pixel.x, source_pixel.y);
+
+    Color *pixels = (Color*)image->data;
+    size_t pixel_count = image->height * image->width;
+    size_t end_ptr = 0;
+    size_t next_ptr = 0;
+    size_t *queue = malloc(pixel_count * sizeof(*queue));
+    bool *visited = malloc(pixel_count * sizeof(*visited));
+    if (queue == NULL || visited == NULL){
+        perror("unable to allocate sufficient memory\n");
+        free(queue);
+        free(visited);
+        return;
+    }
+
+    memset(visited, 0, pixel_count * sizeof(*visited));
+
+    size_t source_pixel_idx = (int)source_pixel.x + (int)source_pixel.y * image->width;
+    queue[end_ptr++] = source_pixel_idx;
+
+    while(end_ptr != next_ptr){
+        if (end_ptr == pixel_count-1){
+            free(queue);
+            free(visited);
+            return;
+        }
+
+        size_t pixel_idx = queue[next_ptr++];
+        pixels[pixel_idx] = new_color;
+
+        if (pixel_idx >= 1){
+            size_t west = pixel_idx - 1;
+            if (memcmp(&pixels[west], &old_color, sizeof(old_color)) == 0){
+                if (!visited[west]){
+                    queue[end_ptr++] = west;
+                    visited[west] = true;
+                }
+            }
+        }
+        if (pixel_idx < pixel_count - 1){
+            size_t east = pixel_idx + 1;
+            if (memcmp(&pixels[east], &old_color, sizeof(old_color)) == 0){
+                if (!visited[east]){
+                    queue[end_ptr++] = east;
+                    visited[east] = true;
+                }
+            }
+        }
+        if (pixel_idx < pixel_count - image->width){
+            size_t south = pixel_idx + image->width;
+            if (memcmp(&pixels[south], &old_color, sizeof(old_color)) == 0){
+                if (!visited[south]){
+                    queue[end_ptr++] = south;
+                    visited[south] = true;
+                }
+            }
+        }
+        if (pixel_idx >= (size_t)image->width){
+            size_t north = pixel_idx - image->width;
+            if (memcmp(&pixels[north], &old_color, sizeof(old_color)) == 0){
+                if (!visited[north]){
+                    queue[end_ptr++] = north;
+                    visited[north] = true;
+                }
+            }
+        }
+    }
+
+    free(queue);
+    free(visited);
+}
+
 
 int main(int argc, char **argv){
 
@@ -271,12 +352,23 @@ int main(int argc, char **argv){
                     alpha = pixel_color.a;
                     UnloadImage(canvas_content);
                 }
+                // TODO: disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
+                // color fill
+                else if (cursor == CURSOR_COLOR_FILL && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    cursor = CURSOR_DEFAULT;
+                    Image canvas_content = LoadImageFromTexture(buffer); // canvas content could be loaded as soon as pipette mode activates, if responsiveness is an issue.
+                    Color active_color = HSVToColor(active_hsv, alpha);
+                    imageColorFlood(&canvas_content, pixel, active_color);
+                    setTextureToImage(&buffer, &canvas_content);
+                    UnloadImage(canvas_content);
+                }
             }
             // shortcuts
             if (!isEditingHexField){
                 if(IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL))) save_texture_as_image(buffer, name_field);
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
                 if(IsKeyPressed(KEY_P)) togglePipette(&cursor);
+                if(IsKeyPressed(KEY_F)) toggleColorFill(&cursor);
             }
         }
 
@@ -352,6 +444,19 @@ int main(int argc, char **argv){
         }
         // TODO: icon should scale with font size.
         GuiDrawIcon(27, menu_padding + menu_content_width - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size), 2, WHITE);
+
+        item++;
+
+        // color fill button
+        Rectangle color_fill_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+        if(GuiButton(color_fill_box, "color fill")){
+            toggleColorFill(&cursor);
+        }
+        if (cursor == CURSOR_COLOR_FILL){
+            DrawRectangleRec(color_fill_box, ColorAlpha(RED, 0.3));
+        }
+        // TODO: icon should scale with font size.
+        GuiDrawIcon(29, menu_padding + menu_content_width - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size), 2, WHITE);
 
         item++;
 
