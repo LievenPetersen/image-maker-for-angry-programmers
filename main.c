@@ -320,7 +320,8 @@ int main(int argc, char **argv){
     float scale = 0;
     Vector2 position = {0};
 
-    Rectangle drawingBounds = {0, 0, GetScreenWidth(), GetScreenHeight()};
+    Rectangle drawingBounds = {0};
+    Rectangle menu_rect = {0};
 
     // Track hsv + alpha instead of rgba,
     // because rgba can only store lossy hue values which leads to jitters when color approaches white or black.
@@ -332,6 +333,7 @@ int main(int argc, char **argv){
         if (IsWindowResized() || forceWindowResize){
             forceWindowResize = false;
             drawingBounds = (Rectangle){menu_width, 0, GetScreenWidth()-menu_width, GetScreenHeight()};
+            menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
             if (hasImage){
                 // TODO support images bigger than drawingBounds
                 scale = MAX(1.0f, floor(MIN(drawingBounds.width / image_size.x, drawingBounds.height / image_size.y)));
@@ -341,7 +343,7 @@ int main(int argc, char **argv){
             }
         }
         // name field can overlap with the canvas
-        if (hasImage && !isEditingNameField){
+        if (hasImage && !isEditingNameField && !CheckCollisionPointRec(GetMousePosition(), menu_rect)){
             // detect canvas click
             Rectangle image_bounds = {position.x, position.y, image_size.x*scale, image_size.y*scale};
             if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
