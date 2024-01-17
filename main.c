@@ -123,13 +123,8 @@ void SetWindowTitleImage(const char *image_path){
     SetWindowTitle(title);
 }
 
-void togglePipette(enum CURSOR_MODE *cursor){
-    if (*cursor != CURSOR_PIPETTE) *cursor = CURSOR_PIPETTE;
-    else *cursor = CURSOR_DEFAULT;
-}
-
-void toggleColorFill(enum CURSOR_MODE *cursor){
-    if (*cursor != CURSOR_COLOR_FILL) *cursor = CURSOR_COLOR_FILL;
+void toggleTool(enum CURSOR_MODE *cursor, enum CURSOR_MODE tool){
+    if (*cursor != tool) *cursor = tool;
     else *cursor = CURSOR_DEFAULT;
 }
 
@@ -140,7 +135,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
     size_t pixel_count = image->height * image->width;
     size_t end_ptr = 0;
     size_t next_ptr = 0;
-    size_t *queue = malloc(pixel_count * sizeof(*queue));
+    size_t *queue = malloc(4 * pixel_count * sizeof(*queue));
     bool *visited = malloc(pixel_count * sizeof(*visited));
     if (queue == NULL || visited == NULL){
         perror("unable to allocate sufficient memory\n");
@@ -155,7 +150,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
     queue[end_ptr++] = source_pixel_idx;
 
     while(end_ptr != next_ptr){
-        if (end_ptr == pixel_count-1){
+        if (end_ptr == 4*pixel_count - 1){
             free(queue);
             free(visited);
             return;
@@ -204,6 +199,19 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
 
     free(queue);
     free(visited);
+}
+
+void toolToggleButton(const char *text, enum CURSOR_MODE *cursor, enum CURSOR_MODE tool, int iconId, int y_position, int h_padding, int total_width, int font_size){
+    // pipette
+    Rectangle pipette_box = {h_padding, y_position, total_width - font_size, font_size};
+    if(GuiButton(pipette_box, text)){
+        toggleTool(cursor , tool);
+    }
+    if (*cursor == tool){
+        DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
+    }
+    // TODO: icon should scale with font size.
+    GuiDrawIcon(iconId, h_padding + total_width - font_size, y_position, 2, WHITE);
 }
 
 
@@ -367,8 +375,8 @@ int main(int argc, char **argv){
             if (!isEditingHexField){
                 if(IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL))) save_texture_as_image(buffer, name_field);
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
-                if(IsKeyPressed(KEY_P)) togglePipette(&cursor);
-                if(IsKeyPressed(KEY_F)) toggleColorFill(&cursor);
+                if(IsKeyPressed(KEY_P)) toggleTool(&cursor, CURSOR_PIPETTE);
+                if(IsKeyPressed(KEY_F)) toggleTool(&cursor, CURSOR_COLOR_FILL);
             }
         }
 
@@ -434,32 +442,12 @@ int main(int argc, char **argv){
         int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size;
         int item = 0;
 
-        // pipette
-        Rectangle pipette_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        if(GuiButton(pipette_box, "pipette")){
-            togglePipette(&cursor);
-        }
-        if (cursor == CURSOR_PIPETTE){
-            DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
-        }
-        // TODO: icon should scale with font size.
-        GuiDrawIcon(27, menu_padding + menu_content_width - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size), 2, WHITE);
+        toolToggleButton("pipette", &cursor, CURSOR_PIPETTE, 27, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
         item++;
-
-        // color fill button
-        Rectangle color_fill_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        if(GuiButton(color_fill_box, "color fill")){
-            toggleColorFill(&cursor);
-        }
-        if (cursor == CURSOR_COLOR_FILL){
-            DrawRectangleRec(color_fill_box, ColorAlpha(RED, 0.3));
-        }
-        // TODO: icon should scale with font size.
-        GuiDrawIcon(29, menu_padding + menu_content_width - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size), 2, WHITE);
+        toolToggleButton("color fill", &cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
         item++;
-
         // grid checkbox
         GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
 
