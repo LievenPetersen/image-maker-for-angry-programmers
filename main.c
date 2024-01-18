@@ -33,6 +33,8 @@
 #define RAYGUI_IMPLEMENTATION
 #include "external/raygui.h"
 
+#include "external/stack.h"
+
 #define MAX_NAME_FIELD_SIZE 200
 
 #define MIN(a, b) (a<b? (a) : (b))
@@ -156,13 +158,12 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
 
     Color *pixels = (Color*)image->data;
     size_t pixel_count = image->height * image->width;
-    size_t end_ptr = 0;
-    size_t next_ptr = 0;
-    size_t *queue = malloc(4 * pixel_count * sizeof(*queue));
+    size_t *stack = NULL;
+    stack_reserve_capacity(stack, pixel_count);
     bool *visited = malloc(pixel_count * sizeof(*visited));
-    if (queue == NULL || visited == NULL){
+    if (visited == NULL){
         perror("unable to allocate sufficient memory\n");
-        free(queue);
+        stack_free(stack);
         free(visited);
         return;
     }
@@ -170,23 +171,17 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
     memset(visited, 0, pixel_count * sizeof(*visited));
 
     size_t source_pixel_idx = (int)source_pixel.x + (int)source_pixel.y * image->width;
-    queue[end_ptr++] = source_pixel_idx;
+    stack_push(stack, source_pixel_idx);
 
-    while(end_ptr != next_ptr){
-        if (end_ptr == 4*pixel_count - 1){
-            free(queue);
-            free(visited);
-            return;
-        }
-
-        size_t pixel_idx = queue[next_ptr++];
+    while(stack_size(stack) > 0){
+        size_t pixel_idx = stack_pop(stack);
         pixels[pixel_idx] = new_color;
 
         if (pixel_idx >= 1){
             size_t west = pixel_idx - 1;
             if (memcmp(&pixels[west], &old_color, sizeof(old_color)) == 0){
                 if (!visited[west]){
-                    queue[end_ptr++] = west;
+                    stack_push(stack, west);
                     visited[west] = true;
                 }
             }
@@ -195,7 +190,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
             size_t east = pixel_idx + 1;
             if (memcmp(&pixels[east], &old_color, sizeof(old_color)) == 0){
                 if (!visited[east]){
-                    queue[end_ptr++] = east;
+                    stack_push(stack, east);
                     visited[east] = true;
                 }
             }
@@ -204,7 +199,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
             size_t south = pixel_idx + image->width;
             if (memcmp(&pixels[south], &old_color, sizeof(old_color)) == 0){
                 if (!visited[south]){
-                    queue[end_ptr++] = south;
+                    stack_push(stack, south);
                     visited[south] = true;
                 }
             }
@@ -213,14 +208,14 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
             size_t north = pixel_idx - image->width;
             if (memcmp(&pixels[north], &old_color, sizeof(old_color)) == 0){
                 if (!visited[north]){
-                    queue[end_ptr++] = north;
+                    stack_push(stack, north);
                     visited[north] = true;
                 }
             }
         }
     }
 
-    free(queue);
+    stack_free(stack);
     free(visited);
 }
 
