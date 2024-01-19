@@ -361,10 +361,10 @@ int main(int argc, char **argv){
             }
         }
         // name field can overlap with the canvas
-        if (hasImage && !isEditingNameField && !CheckCollisionPointRec(GetMousePosition(), menu_rect)){
+        if (hasImage && !isEditingNameField){
             // detect canvas click
             Rectangle image_bounds = {position.x, position.y, image_size.x*scale, image_size.y*scale};
-            if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
+            if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds) && !CheckCollisionPointRec(GetMousePosition(), menu_rect)){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1/scale);
                 // set pixel
                 if (cursor == CURSOR_DEFAULT){
