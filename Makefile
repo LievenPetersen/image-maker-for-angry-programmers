@@ -12,7 +12,8 @@ PLATFORM = -DPLATFORM_DESKTOP
 # flags for building imFAP
 FLAGS = -Wall -Wextra -pedantic -ggdb
 
-SRCS = $(wildcard *.c)
+SRC_DIR = src
+SRCS = $(wildcard $(SRC_DIR)/*.c)
 
 OUTPUT_LIN = imfap
 OUTPUT_WIN = imfap.exe
@@ -27,13 +28,12 @@ ifeq ($(TARGET), Windows)
 	LIBS = -lopengl32 -lgdi32 -lwinmm
 endif
 
-# flags for building raylib locally
-CFLAGS = $(PLATFORM) -I$(RAY_PATH)external/glfw/include
-
-RAY_PATH = external/raylib/src/
+RAY_PATH = $(SRC_DIR)/external/raylib/src/
 RAY_SRCS = $(wildcard $(addsuffix *.c, $(RAY_PATH)))
 RAY_OBJS = $(RAY_SRCS:c=o)
 
+# flags for building raylib locally
+CFLAGS = $(PLATFORM) -I$(RAY_PATH)external/glfw/include
 
 all: build
 
