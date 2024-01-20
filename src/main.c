@@ -49,6 +49,9 @@ enum CURSOR_MODE{
     CURSOR_COLOR_FILL,
 };
 
+Vector2 RectangleCenter(Rectangle rect){
+    return (Vector2){rect.x + rect.width/2.0f, rect.y + rect.height/2.0f};
+}
 
 bool IsSupportedImageFormat(const char *filePath){
     const char *VALID_EXTENSIONS = ".png;.bmp;.qoi;.raw"; //.tga;.jpg;.jpeg"; // .tga and .jpg don't work for some reason
@@ -205,10 +208,13 @@ int main(int argc, char **argv){
     bool forceWindowResize = true;
     bool showGrid = true;
 
-    float scale = 0;
+    // this could possibly be encapsulated. Any change in floating scale requires scale to be set as well.
+    float _floating_scale = 0; // used to affect scale. To enable small changes a float is needed.
+    int scale = 0; // floored floating scale that should be used everywhere.
 
     Rectangle drawingBounds = {0};
     Rectangle menu_rect = {0};
+    Vector2 image_position = {0};
 
     // Track hsv + alpha instead of rgba,
     // because rgba can only store lossy hue values which leads to jitters when color approaches white or black.
@@ -223,18 +229,21 @@ int main(int argc, char **argv){
             menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
             if (hasImage){
                 // TODO support images bigger than drawingBounds
-                scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas.size.x, drawingBounds.height / canvas.size.y)));
-                canvas.position = (Vector2){drawingBounds.width - canvas.size.x*scale, drawingBounds.height - canvas.size.y*scale};
-                canvas.position = Vector2Scale(canvas.position, 0.5);
-                canvas.position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, canvas.position);
+                // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
+                _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas.size.x, drawingBounds.height / canvas.size.y)));
+                scale = (int)_floating_scale;
+                image_position = (Vector2){drawingBounds.width - canvas.size.x*scale, drawingBounds.height - canvas.size.y*scale};
+                image_position = Vector2Scale(image_position, 0.5);
+                image_position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, image_position);
             }
         }
-        // name field can overlap with the canvas
-        if (hasImage && !isEditingNameField){
+        // handle mouse and keyboard input
+        if (hasImage && !isEditingNameField){ // name field can overlap with the canvas
+            bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
             // detect canvas click
-            Rectangle image_bounds = {canvas.position.x, canvas.position.y, canvas.size.x*scale, canvas.size.y*scale};
-            if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds) && !CheckCollisionPointRec(GetMousePosition(), menu_rect)){
-                Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1/scale);
+            Rectangle image_bounds = {image_position.x, image_position.y, canvas.size.x*scale, canvas.size.y*scale};
+            if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds) && !isHoveringMenu){
+                Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
                 if (cursor == CURSOR_DEFAULT){
                     Color active_color = HSVToColor(active_hsv, alpha);
@@ -258,28 +267,66 @@ int main(int argc, char **argv){
             // shortcuts
             if (!isEditingHexField){
                 bool isCtrlDown = (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL));
-                if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
-                if(IsKeyPressed(KEY_P)) toggleTool(&cursor, CURSOR_PIPETTE);
-                if(IsKeyPressed(KEY_F)) toggleTool(&cursor, CURSOR_COLOR_FILL);
-                if(IsKeyPressed(KEY_C) && isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
-                if(IsKeyPressed(KEY_S) && isCtrlDown) canvas_save_as_image(&canvas, name_field);
-                if(IsKeyPressed(KEY_ESCAPE)) cursor = CURSOR_DEFAULT;
+                if(GetKeyPressed()){ // a key was pressed this frame (this gets the next key in the queue, but we don't use that.)
+                    if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
+                    if(IsKeyPressed(KEY_P)) toggleTool(&cursor, CURSOR_PIPETTE);
+                    if(IsKeyPressed(KEY_F)) toggleTool(&cursor, CURSOR_COLOR_FILL);
+                    if(IsKeyPressed(KEY_C) && isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
+                    if(IsKeyPressed(KEY_S) && isCtrlDown) canvas_save_as_image(&canvas, name_field);
+                    if(IsKeyPressed(KEY_ESCAPE)) cursor = CURSOR_DEFAULT;
+                    if(IsKeyPressed(KEY_HOME)) forceWindowResize = true; // this causes the canvas to be centered again.
+                }
+
+                Vector2 pan = {0};
+                if(IsKeyDown(KEY_LEFT))  pan.x += 1;
+                if(IsKeyDown(KEY_RIGHT)) pan.x -= 1;
+                if(IsKeyDown(KEY_UP))    pan.y += 1;
+                if(IsKeyDown(KEY_DOWN))  pan.y -= 1;
+                const float key_pan_speed = MIN(GetScreenHeight(), GetScreenWidth()); // scale panning speed with window size.
+                image_position = Vector2Add(image_position, Vector2Scale(pan, GetFrameTime()*key_pan_speed));
             }
+            // mouse panning
+            // FIXME: image_bounds becomes outdated from here on
+            if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) || IsMouseButtonDown(MOUSE_BUTTON_MIDDLE)){
+                // if this solution proves too flimsy, track the mouse position relative to it's position at the start of the pan.
+                image_position = Vector2Add(image_position, GetMouseDelta());
+            }
+            float mouse_scroll;
+            if ((mouse_scroll = GetMouseWheelMove())){
+                const float scroll_speed = 1.5; // must be > 1
+                float new_scale = MAX(mouse_scroll>0.0f? _floating_scale*scroll_speed : _floating_scale/scroll_speed, 1.0f);
+
+                // Zoom to mouse formula: new_pos = focus + (new_scale/old_scale) (focus - old_pos)
+                Vector2 focus = isHoveringMenu? RectangleCenter(drawingBounds) : GetMousePosition();
+                Vector2 focus_offset = Vector2Subtract(focus, image_position);
+                Vector2 scaled_summand = Vector2Scale(focus_offset, (float)((int)new_scale)/(float)((int)_floating_scale)); // poor man's floorf
+                image_position = Vector2Subtract(focus, scaled_summand);
+
+                _floating_scale = new_scale;
+                scale = (int)_floating_scale;
+            }
+            // after all moving functions are done:
+            // ensure that part of the canvas is still in the draw area.
+            Vector2 image_size = Vector2Scale(canvas.size, (int)_floating_scale);
+            if (image_position.x + image_size.x < drawingBounds.x + scale) image_position.x = drawingBounds.x - image_size.x + scale;
+            if (image_position.y + image_size.y < drawingBounds.y + scale) image_position.y = drawingBounds.y - image_size.y + scale;
+            if (drawingBounds.x + drawingBounds.width  < image_position.x + scale) image_position.x = drawingBounds.x + drawingBounds.width - scale;
+            if (drawingBounds.y + drawingBounds.height < image_position.y + scale) image_position.y = drawingBounds.y + drawingBounds.height - scale;
         }
 
         BeginDrawing();
         ClearBackground(FAV_COLOR);
 
         // draw image
-        DrawTextureEx(canvas.tex, canvas.position, 0, scale, WHITE);
+        DrawTextureEx(canvas.tex, image_position, 0, scale, WHITE); // use int scale, so that every pixel of the texture is drawn as the same multiple. This is important for drawing the grid.
 
         // draw grid
         if(showGrid && scale >= 3){
             for (int i = 1; i < canvas.size.x; i++){
-                DrawLineEx((Vector2){canvas.position.x + i*scale, canvas.position.y}, (Vector2){canvas.position.x + i*scale, canvas.position.y + canvas.size.y*scale}, 1, BLACK);
+                DrawLineEx((Vector2){image_position.x + i*scale, image_position.y}, (Vector2){image_position.x + i*scale, image_position.y + canvas.size.y*scale}, 1, BLACK);
             }
             for (int j = 1; j < canvas.size.y; j++){
-                DrawLineEx((Vector2){canvas.position.x, canvas.position.y + j*scale}, (Vector2){canvas.position.x + canvas.size.x*scale, canvas.position.y + j*scale}, 1, BLACK);
+                DrawLineEx((Vector2){image_position.x, image_position.y + j*scale}, (Vector2){image_position.x + canvas.size.x*scale, image_position.y + j*scale}, 1, BLACK);
             }
         }
 

@@ -24,7 +24,6 @@
 
 // all fields are readonly
 typedef struct canvas_t{
-    Vector2 position;
     Vector2 size;
     Texture2D tex;
 }canvas_t;
