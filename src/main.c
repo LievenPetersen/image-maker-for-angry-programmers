@@ -257,10 +257,13 @@ int main(int argc, char **argv){
             }
             // shortcuts
             if (!isEditingHexField){
-                if(IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL))) canvas_save_as_image(&canvas, name_field);
+                bool isCtrlDown = (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL));
                 if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
                 if(IsKeyPressed(KEY_P)) toggleTool(&cursor, CURSOR_PIPETTE);
                 if(IsKeyPressed(KEY_F)) toggleTool(&cursor, CURSOR_COLOR_FILL);
+                if(IsKeyPressed(KEY_C) && isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
+                if(IsKeyPressed(KEY_S) && isCtrlDown) canvas_save_as_image(&canvas, name_field);
+                if(IsKeyPressed(KEY_ESCAPE)) cursor = CURSOR_DEFAULT;
             }
         }
 
