@@ -293,7 +293,7 @@ int main(int argc, char **argv){
             }
             float mouse_scroll;
             if ((mouse_scroll = GetMouseWheelMove())){
-                const float scroll_speed = 1.5; // must be > 1
+                const float scroll_speed = 1.2; // must be > 1
                 float new_scale = MAX(mouse_scroll>0.0f? _floating_scale*scroll_speed : _floating_scale/scroll_speed, 1.0f);
 
                 // Zoom to mouse formula: new_pos = focus + (new_scale/old_scale) (focus - old_pos)
@@ -318,16 +318,19 @@ int main(int argc, char **argv){
         ClearBackground(FAV_COLOR);
 
         // draw image
-        DrawTextureEx(canvas.tex, image_position, 0, scale, WHITE); // use int scale, so that every pixel of the texture is drawn as the same multiple. This is important for drawing the grid.
+        Vector2 floored_image_position = {(int)image_position.x, (int)image_position.y}; // image_position is not an integer value at this point, which can cause slight distortions when drawing. outright flooring it degrades zoom precision.
+        DrawTextureEx(canvas.tex, floored_image_position, 0, scale, WHITE); // use int scale, so that every pixel of the texture is drawn as the same multiple. This is important for drawing the grid.
 
         // draw grid
+        const Color GRID_COLOR = DARKGRAY;
         if(showGrid && scale >= 3){
             for (int i = 1; i < canvas.size.x; i++){
-                DrawLineEx((Vector2){image_position.x + i*scale, image_position.y}, (Vector2){image_position.x + i*scale, image_position.y + canvas.size.y*scale}, 1, BLACK);
+                DrawLineEx((Vector2){floored_image_position.x + i*scale, floored_image_position.y}, (Vector2){floored_image_position.x + i*scale, floored_image_position.y + canvas.size.y*scale}, 1, GRID_COLOR);
             }
             for (int j = 1; j < canvas.size.y; j++){
-                DrawLineEx((Vector2){image_position.x, image_position.y + j*scale}, (Vector2){image_position.x + canvas.size.x*scale, image_position.y + j*scale}, 1, BLACK);
+                DrawLineEx((Vector2){floored_image_position.x, floored_image_position.y + j*scale}, (Vector2){floored_image_position.x + canvas.size.x*scale, floored_image_position.y + j*scale}, 1, GRID_COLOR);
             }
+            DrawRectangleLines(floored_image_position.x-1, floored_image_position.y-1, canvas.size.x*scale+2, canvas.size.y*scale+2, GRID_COLOR);
         }
 
         // draw menu
