@@ -28,14 +28,14 @@ typedef struct canvas_t{
     Texture2D tex;
 }canvas_t;
 
-void canvas_set_pixel(canvas_t *canvas, Vector2 pixel, Color color);
-void canvas_set_to_image(canvas_t *canvas, Image image);
-void canvas_color_flood(canvas_t *canvas, Vector2 source, Color flood);
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color);
+void canvas_setToImage(canvas_t *canvas, Image image);
+void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood);
 
 void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill);
 
-Image canvas_get_content(canvas_t *canvas);
-Color canvas_get_pixel(canvas_t *canvas, Vector2 pixel);
+Image canvas_getContent(canvas_t *canvas);
+Color canvas_getPixel(canvas_t *canvas, Vector2 pixel);
 
 void canvas_save_as_image(canvas_t *canvas, const char *path);
 

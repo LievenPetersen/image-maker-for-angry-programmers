@@ -53,18 +53,12 @@ Vector2 RectangleCenter(Rectangle rect){
     return (Vector2){rect.x + rect.width/2.0f, rect.y + rect.height/2.0f};
 }
 
-bool IsSupportedImageFormat(const char *filePath){
+bool isSupportedImageFormat(const char *filePath){
     const char *VALID_EXTENSIONS = ".png;.bmp;.qoi;.raw"; //.tga;.jpg;.jpeg"; // .tga and .jpg don't work for some reason
     return IsFileExtension(filePath, VALID_EXTENSIONS);
 }
 
-Color HSVToColor(Vector3 hsv, unsigned char alpha){
-    Color color = ColorFromHSV(hsv.x, hsv.y, hsv.z);
-    color.a = alpha;
-    return color;
-}
-
-void SetWindowTitleImage(const char *image_path){
+void setWindowTitleToPath(const char *image_path){
     char title[MAX_NAME_FIELD_SIZE + 100];
     sprintf(title, "%s - Image maker for angry programmers", image_path);
     SetWindowTitle(title);
@@ -90,7 +84,7 @@ void toolToggleButton(const char *text, enum CURSOR_MODE *cursor, enum CURSOR_MO
 }
 
 // returns > 0  on resize
-long dimension_text_box(const Rectangle bounds, char *str_value, const size_t str_size, long reset_value, bool *isEditing){
+long dimensionTextBox(const Rectangle bounds, char *str_value, const size_t str_size, long reset_value, bool *isEditing){
     long result = -1;
     if (GuiTextBox(bounds, str_value, str_size, *isEditing)){
         *isEditing = !*isEditing;
@@ -110,6 +104,11 @@ long dimension_text_box(const Rectangle bounds, char *str_value, const size_t st
     return result;
 }
 
+Color HSVToColor(Vector3 hsv, unsigned char alpha){
+    Color color = ColorFromHSV(hsv.x, hsv.y, hsv.z);
+    color.a = alpha;
+    return color;
+}
 
 // fields are READONLY
 typedef struct color_t{
@@ -158,13 +157,13 @@ int main(int argc, char **argv){
             UnloadImage(img);
             return 1;
         }
-        canvas_set_to_image(&canvas, img);
+        canvas_setToImage(&canvas, img);
         if (strnlen(argv[1], MAX_NAME_FIELD_SIZE) == MAX_NAME_FIELD_SIZE){
             name_field[MAX_NAME_FIELD_SIZE-1] = 0; // brutal approach to make string fit.
             // TODO: more graceful solution, that doesn't rip out the postfix.
         }
         sprintf(name_field, "%s", argv[1]);
-        SetWindowTitleImage(name_field);
+        setWindowTitleToPath(name_field);
 
         hasImage = true;
         UnloadImage(img);
@@ -173,7 +172,7 @@ int main(int argc, char **argv){
     // generate standard 8x8 image
     if (!hasImage){
         Image img = GenImageColor(8, 8, STD_COLOR);
-        canvas_set_to_image(&canvas, img);
+        canvas_setToImage(&canvas, img);
         sprintf(name_field, "out.png");
 
         hasImage = true;
@@ -270,18 +269,18 @@ int main(int argc, char **argv){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
                 if (cursor == CURSOR_DEFAULT && mousePressStartedInDefaultMode){
-                    canvas_set_pixel(&canvas, pixel, active_color.rgba);
+                    canvas_setPixel(&canvas, pixel, active_color.rgba);
                 }
                 // pick color with pipette (only on press, not continuously)
                 if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
-                    Color pixel_color = canvas_get_pixel(&canvas, pixel);
+                    Color pixel_color = canvas_getPixel(&canvas, pixel);
                     setFromRGBA(&active_color, pixel_color);
                 }
                 // color fill
                 else if (cursor == CURSOR_COLOR_FILL && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
-                    canvas_color_flood(&canvas, pixel, active_color.rgba);
+                    canvas_colorFlood(&canvas, pixel, active_color.rgba);
                 }
             }
             // shortcuts
@@ -416,7 +415,7 @@ int main(int argc, char **argv){
 
         // x resize textbox
         Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        long res = dimension_text_box(x_box, x_field, DIM_STRLEN, canvas.size.x, &isEditingXField);
+        long res = dimensionTextBox(x_box, x_field, DIM_STRLEN, canvas.size.x, &isEditingXField);
         if (res > 0){
             // TODO: fix flicker on resize? (caused by unloading the currently drawn texture)
             canvas.size.x = res;
@@ -427,7 +426,7 @@ int main(int argc, char **argv){
 
         // y resize textbox
         Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        res = dimension_text_box(y_box, y_field, DIM_STRLEN, canvas.size.y, &isEditingYField);
+        res = dimensionTextBox(y_box, y_field, DIM_STRLEN, canvas.size.y, &isEditingYField);
         if (res > 0){
             canvas.size.y = res;
             forceWindowResize = true;
@@ -453,11 +452,11 @@ int main(int argc, char **argv){
             isEditingNameField = !isEditingNameField;
             // validate
             if (!isEditingNameField){
-                if (IsSupportedImageFormat(name_field) 
+                if (isSupportedImageFormat(name_field) 
                     && DirectoryExists(GetDirectoryPath(name_field))){
                     // accept new name
                         memcpy(name_field_old, name_field, strlen(name_field)+1);
-                        SetWindowTitleImage(name_field);
+                        setWindowTitleToPath(name_field);
                 } else {
                     // reject name: reset to old name
                     memcpy(name_field, name_field_old, strlen(name_field_old)+1);

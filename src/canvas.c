@@ -31,7 +31,7 @@
 
 
 
-bool save_texture_as_image(Texture2D tex, const char *path){
+bool saveTextureAsImage(Texture2D tex, const char *path){
     Image result = LoadImageFromTexture(tex);
 
     bool success = IsImageReady(result)
@@ -158,35 +158,35 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
 }
 
 
-void canvas_set_to_image(canvas_t *canvas, Image image){
+void canvas_setToImage(canvas_t *canvas, Image image){
     if (setTextureToImage(&canvas->tex, &image)){
         canvas->size.x = image.width;
         canvas->size.y = image.height;
     }
 }
 
-void canvas_set_pixel(canvas_t *canvas, Vector2 pixel, Color color){
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
     UpdateTextureRec(canvas->tex, (Rectangle){pixel.x, pixel.y, 1, 1}, &color);
 }
 
-Image canvas_get_content(canvas_t *canvas){
+Image canvas_getContent(canvas_t *canvas){
     return LoadImageFromTexture(canvas->tex);
 }
 
 void canvas_save_as_image(canvas_t *canvas, const char *path){
-    save_texture_as_image(canvas->tex, path);
+    saveTextureAsImage(canvas->tex, path);
 }
 
-Color canvas_get_pixel(canvas_t *canvas, Vector2 pixel){
+Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
     // TODO: cache image?
-    Image canvas_content = canvas_get_content(canvas);
+    Image canvas_content = canvas_getContent(canvas);
     Color pixel_color = GetImageColor(canvas_content, pixel.x, pixel.y);
     UnloadImage(canvas_content);
     return pixel_color;
 }
 
 void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
-    Image img = LoadImageFromTexture(canvas->tex);
+    Image img = canvas_getContent(canvas);
     ImageResizeCanvasOwn(&img, new_size.x, new_size.y, 0, 0, fill);
     if(setTextureToImage(&canvas->tex, &img)){
         canvas->size.x = new_size.x;
@@ -195,10 +195,10 @@ void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
     UnloadImage(img);
 }
 
-void canvas_color_flood(canvas_t *canvas, Vector2 source, Color flood){
-    Image canvas_content = canvas_get_content(canvas); // canvas content could be loaded as soon as pipette mode activates, if responsiveness is an issue.
+void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
+    Image canvas_content = canvas_getContent(canvas); // canvas content could be loaded as soon as pipette mode activates, if responsiveness is an issue.
     imageColorFlood(&canvas_content, source, flood);
-    canvas_set_to_image(canvas, canvas_content);
+    canvas_setToImage(canvas, canvas_content);
     UnloadImage(canvas_content);
 }
 
