@@ -110,6 +110,24 @@ long dimension_text_box(const Rectangle bounds, char *str_value, const size_t st
     return result;
 }
 
+
+// fields are READONLY
+typedef struct color_t{
+    Color rgba;  // READONLY
+    Vector3 hsv; // READONLY
+}color_t;
+
+void setFromRGBA(color_t *color, Color rgba){
+    color->rgba = rgba;
+    color->hsv = ColorToHSV(rgba);
+}
+
+void setFromHSV(color_t *color, Vector3 hsv){
+    color->hsv = hsv;
+    color->rgba = HSVToColor(hsv, color->rgba.a);
+}
+
+
 int main(int argc, char **argv){
 
     // draw loading screen
@@ -219,9 +237,10 @@ int main(int argc, char **argv){
     Vector2 image_position = {0};
 
     // Track hsv + alpha instead of rgba,
-    // because rgba can only store lossy hue values which leads to jitters when color approaches white or black.
-    Vector3 active_hsv = ColorToHSV(FAV_COLOR);
-    unsigned char alpha = FAV_COLOR.a;
+    // because rgba can only store lossy hue values which leads to color-picker jitters when color approaches white or black.
+    color_t active_color = {0};
+    setFromRGBA(&active_color, FAV_COLOR); // important to initialize from rgba, because HSV does not supply alpha information.
+
     enum CURSOR_MODE cursor = CURSOR_DEFAULT;
 
     while(!WindowShouldClose()){
@@ -251,21 +270,18 @@ int main(int argc, char **argv){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
                 if (cursor == CURSOR_DEFAULT && mousePressStartedInDefaultMode){
-                    Color active_color = HSVToColor(active_hsv, alpha);
-                    canvas_set_pixel(&canvas, pixel, active_color);
+                    canvas_set_pixel(&canvas, pixel, active_color.rgba);
                 }
                 // pick color with pipette (only on press, not continuously)
                 if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
                     Color pixel_color = canvas_get_pixel(&canvas, pixel);
-                    active_hsv = ColorToHSV(pixel_color);
-                    alpha = pixel_color.a;
+                    setFromRGBA(&active_color, pixel_color);
                 }
                 // color fill
                 else if (cursor == CURSOR_COLOR_FILL && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
-                    Color active_color = HSVToColor(active_hsv, alpha);
-                    canvas_color_flood(&canvas, pixel, active_color);
+                    canvas_color_flood(&canvas, pixel, active_color.rgba);
                 }
             }
             // shortcuts
@@ -344,14 +360,21 @@ int main(int argc, char **argv){
         int color_picker_y = menu_padding;
         int color_picker_size = menu_content_width - huebar_width - huebar_padding;
 
-        float bar_hue = active_hsv.x; // The color panel should only affect saturation & value. Thus hue is buffered.
-        GuiColorPanelHSV((Rectangle){menu_padding, color_picker_y, color_picker_size, color_picker_size}, "heyyyy", &active_hsv);
+        Vector3 color_picker_hsv = active_color.hsv;
+        float bar_hue = color_picker_hsv.x; // The color panel should only affect saturation & value. Thus hue is buffered.
+        GuiColorPanelHSV((Rectangle){menu_padding, color_picker_y, color_picker_size, color_picker_size}, "heyyyy", &color_picker_hsv);
         GuiColorBarHue((Rectangle){menu_padding + color_picker_size + huebar_padding, color_picker_y, huebar_width, color_picker_size}, "oiii", &bar_hue);
-        active_hsv.x = bar_hue;
+        color_picker_hsv.x = bar_hue;
+
+        // check if the color picker changed the color
+        if (memcmp(&color_picker_hsv, &active_color.hsv, sizeof(color_picker_hsv)) != 0){
+            setFromHSV(&active_color, color_picker_hsv);
+        }
+
 
         // hex code text box
         if (!isEditingHexField){
-            Color color = HSVToColor(active_hsv, alpha);
+            Color color = active_color.rgba;
             sprintf(hex_field, "%02X%02X%02X%02X", color.r, color.g, color.b, color.a);
         }
 
@@ -374,8 +397,7 @@ int main(int argc, char **argv){
                 } else {
                     Color new_color = {0};
                     sscanf(hex_field, "%02X%02X%02X%02X", (unsigned int*)&new_color.r, (unsigned int*)&new_color.g, (unsigned int*)&new_color.b, (unsigned int*)&new_color.a);
-                    active_hsv = ColorToHSV(new_color);
-                    alpha = new_color.a;
+                    setFromRGBA(&active_color, new_color);
                 }
             }
         }
