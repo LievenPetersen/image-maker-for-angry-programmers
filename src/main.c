@@ -208,6 +208,8 @@ int main(int argc, char **argv){
     bool forceWindowResize = true;
     bool showGrid = true;
 
+    bool mousePressStartedInDefaultMode = false;
+
     // this could possibly be encapsulated. Any change in floating scale requires scale to be set as well.
     float _floating_scale = 0; // used to affect scale. To enable small changes a float is needed.
     int scale = 0; // floored floating scale that should be used everywhere.
@@ -239,13 +241,16 @@ int main(int argc, char **argv){
         }
         // handle mouse and keyboard input
         if (hasImage && !isEditingNameField){ // name field can overlap with the canvas
-            bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
+            // Disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) mousePressStartedInDefaultMode = cursor == CURSOR_DEFAULT;
+
             // detect canvas click
             Rectangle image_bounds = {image_position.x, image_position.y, canvas.size.x*scale, canvas.size.y*scale};
-            if(IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds) && !isHoveringMenu){
+            bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
+            if (!isHoveringMenu && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
-                if (cursor == CURSOR_DEFAULT){
+                if (cursor == CURSOR_DEFAULT && mousePressStartedInDefaultMode){
                     Color active_color = HSVToColor(active_hsv, alpha);
                     canvas_set_pixel(&canvas, pixel, active_color);
                 }
@@ -256,7 +261,6 @@ int main(int argc, char **argv){
                     active_hsv = ColorToHSV(pixel_color);
                     alpha = pixel_color.a;
                 }
-                // TODO: disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
                 // color fill
                 else if (cursor == CURSOR_COLOR_FILL && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
