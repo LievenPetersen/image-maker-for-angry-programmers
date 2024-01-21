@@ -25,6 +25,14 @@
 *
 **********************************************************************************************/
 
+// NOTICE
+//
+// This file was modified from the original source.
+// Modifications are:
+// - The commenting and un-commenting of #define-s for configuration purposes.
+// - Changing values for configuration purposes.
+// - Additionally this notice was added.
+
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -35,14 +43,14 @@
 #define SUPPORT_MODULE_RSHAPES          1
 #define SUPPORT_MODULE_RTEXTURES        1
 #define SUPPORT_MODULE_RTEXT            1       // WARNING: It requires SUPPORT_MODULE_RTEXTURES to load sprite font textures
-#define SUPPORT_MODULE_RMODELS          1
-#define SUPPORT_MODULE_RAUDIO           1
+// #define SUPPORT_MODULE_RMODELS          1
+// #define SUPPORT_MODULE_RAUDIO           1
 
 //------------------------------------------------------------------------------------
 // Module: rcore - Configuration Flags
 //------------------------------------------------------------------------------------
 // Camera module is included (rcamera.h) and multiple predefined cameras are available: free, 1st/3rd person, orbital
-#define SUPPORT_CAMERA_SYSTEM           1
+// #define SUPPORT_CAMERA_SYSTEM           1
 // Gestures module is included (rgestures.h) to support gestures detection: tap, hold, swipe, drag
 #define SUPPORT_GESTURES_SYSTEM         1
 // Include pseudo-random numbers generator (rprand.h), based on Xoshiro128** and SplitMix64
@@ -65,7 +73,7 @@
 // Support CompressData() and DecompressData() functions
 #define SUPPORT_COMPRESSION_API         1
 // Support automatic generated events, loading and recording of those events when required
-#define SUPPORT_AUTOMATION_EVENTS       1
+// #define SUPPORT_AUTOMATION_EVENTS       1
 // Support custom frame control, only for advance users
 // By default EndDrawing() does this job: draws everything + SwapScreenBuffer() + manage frame timing + PollInputEvents()
 // Enabling this flag allows manual control of the frame processes, use at your own risk
@@ -87,7 +95,7 @@
 
 #define MAX_DECOMPRESSION_SIZE         64       // Max size allocated for decompression in MB
 
-#define MAX_AUTOMATION_EVENTS       16384       // Maximum number of automation events to record
+#define MAX_AUTOMATION_EVENTS           0       // Maximum number of automation events to record
 
 //------------------------------------------------------------------------------------
 // Module: rlgl - Configuration values
