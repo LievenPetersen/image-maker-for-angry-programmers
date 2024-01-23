@@ -207,12 +207,13 @@ int main(int argc, char **argv){
 
     // menu parameters
     int menu_font_size = 30;
-    int menu_width = 200;
-    int menu_padding = 20;
-    int menu_content_width = menu_width - 2*menu_padding;
 
-    int huebar_padding = GuiGetStyle(COLORPICKER, HUEBAR_PADDING);
-    int huebar_width = GuiGetStyle(COLORPICKER, HUEBAR_WIDTH);
+    // these are set on forceMenuResize
+    int menu_width = 0;
+    int menu_padding = 0;
+    int menu_content_width = 0;
+    int huebar_width = 0;
+    int huebar_padding = 0;
 
     // raygui style settings
     GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
@@ -250,6 +251,9 @@ int main(int argc, char **argv){
     }
 
     bool forceWindowResize = true;
+    bool forceMenuResize = true;
+    bool forceImageResize = true;
+
     bool showGrid = true;
 
     bool mousePressStartedInDefaultMode = false;
@@ -272,9 +276,25 @@ int main(int argc, char **argv){
     while(!WindowShouldClose()){
         if (IsWindowResized() || forceWindowResize){
             forceWindowResize = false;
-            drawingBounds = (Rectangle){menu_width, 0, GetScreenWidth()-menu_width, GetScreenHeight()};
+            forceMenuResize = true;
+            forceImageResize = true;
+        }
+        if (forceMenuResize){
+            forceMenuResize = false;
+            forceImageResize = true;
+            // TODO: move parameters to struct?
+            menu_width = 20*menu_font_size/3; // allow font size to force a minimum width
+            menu_padding = menu_width / 10;
+            menu_content_width = menu_width - 2*menu_padding;
+            huebar_width = menu_width*2/25;
+            huebar_padding = huebar_width/2;
             menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
+        }
+        if (forceImageResize){
+            forceImageResize = false;
+            drawingBounds = (Rectangle){menu_width, 0, GetScreenWidth()-menu_width, GetScreenHeight()};
             if (hasImage){
+                // TODO: fit image to rect
                 // TODO support images bigger than drawingBounds
                 // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
                 _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas.size.x, drawingBounds.height / canvas.size.y)));
@@ -313,14 +333,20 @@ int main(int argc, char **argv){
             // shortcuts
             if (!isEditingHexField){
                 bool isCtrlDown = (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL));
-                if(GetKeyPressed()){ // a key was pressed this frame (this gets the next key in the queue, but we don't use that.)
-                    if(IsKeyPressed(KEY_G)) showGrid = !showGrid;
-                    if(IsKeyPressed(KEY_P)) toggleTool(&cursor, CURSOR_PIPETTE);
-                    if(IsKeyPressed(KEY_F)) toggleTool(&cursor, CURSOR_COLOR_FILL);
-                    if(IsKeyPressed(KEY_C) && isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
-                    if(IsKeyPressed(KEY_S) && isCtrlDown) canvas_save_as_image(&canvas, name_field);
-                    if(IsKeyPressed(KEY_ESCAPE)) cursor = CURSOR_DEFAULT;
-                    if(IsKeyPressed(KEY_HOME)) forceWindowResize = true; // this causes the canvas to be centered again.
+                // TODO: investigate if ctrl-+ ctrl-- can be detected for all +/- keys on the keyboard for all +/- keys on the keyboard. with glfw (glfwGetKeyName)
+                int pressed_key = 0;
+                while((pressed_key = GetKeyPressed())){ // a key was pressed this frame (this gets the next key in the queue, but we don't use that.)
+                    switch(pressed_key){
+                        case KEY_G: showGrid = !showGrid; break;
+                        case KEY_P: toggleTool(&cursor, CURSOR_PIPETTE); break;
+                        case KEY_F: toggleTool(&cursor, CURSOR_COLOR_FILL); break;
+                        case KEY_C: if(isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); break; // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
+                        case KEY_S: if(isCtrlDown) canvas_save_as_image(&canvas, name_field); break;
+                        case KEY_ESCAPE: cursor = CURSOR_DEFAULT; break;
+                        case KEY_HOME: forceWindowResize = true; break; // this causes the canvas to be centered again.
+                        case KEY_KP_ADD: {setFontSize(&menu_font_size, menu_font_size + 1); forceMenuResize = true;} break;
+                        case KEY_KP_SUBTRACT: {setFontSize(&menu_font_size, menu_font_size - 1); forceMenuResize = true;} break;
+                    }
                 }
 
                 Vector2 pan = {0};
