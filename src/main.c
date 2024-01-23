@@ -35,8 +35,12 @@
 #include "canvas.h"
 
 #ifndef DISABLE_CUSTOM_FONT
-    #include "font.h"
+#include "font.h"
 #endif //DISABLE_CUSTOM_FONT
+
+#ifndef DEFAULT_FONT_SIZE
+#define DEFAULT_FONT_SIZE 30
+#endif //DEFAULT_FONT_SIZE
 
 #define MAX_NAME_FIELD_SIZE 200
 
@@ -109,11 +113,6 @@ long dimensionTextBox(const Rectangle bounds, char *str_value, const size_t str_
     return result;
 }
 
-void setFontSize(int *font_size, unsigned int new_font_size){
-    *font_size = new_font_size;
-    GuiSetStyle(DEFAULT, TEXT_SIZE, *font_size);
-}
-
 Color HSVToColor(Vector3 hsv, unsigned char alpha){
     Color color = ColorFromHSV(hsv.x, hsv.y, hsv.z);
     color.a = alpha;
@@ -147,7 +146,7 @@ int main(int argc, char **argv){
 
     BeginDrawing();
     char *loading_text = "loading...";
-    int loadingFontSize = 20;
+    int loadingFontSize = DEFAULT_FONT_SIZE;
     DrawText(loading_text, (GetScreenWidth()-MeasureText(loading_text, loadingFontSize))/2, GetScreenHeight()/2, loadingFontSize, WHITE);
     EndDrawing();
 
@@ -206,7 +205,7 @@ int main(int argc, char **argv){
     bool isEditingNameField = false;
 
     // menu parameters
-    int menu_font_size = 30;
+    int menu_font_size = DEFAULT_FONT_SIZE;
 
     // these are set on forceMenuResize
     int menu_width = 0;
@@ -232,23 +231,26 @@ int main(int argc, char **argv){
 
     GuiSetStyle(DEFAULT, BACKGROUND_COLOR, 0x181818FF);
 
+    Font font = {0};
     // load custom font
-    #ifndef DISABLE_CUSTOM_FONT
-        // The font is compressed and encoded into an array.
-        int ttf_font_data_size = 0;
-        unsigned char *ttf_font_data = DecompressData((unsigned char*)COMPRESSED_TTF_FONT, COMPRESSED_TTF_FONT_SIZE, &ttf_font_data_size);
+#ifndef DISABLE_CUSTOM_FONT
+    // The font is compressed and encoded into an array.
+    int ttf_font_data_size = 0;
+    unsigned char *ttf_font_data = DecompressData((unsigned char*)COMPRESSED_TTF_FONT, COMPRESSED_TTF_FONT_SIZE, &ttf_font_data_size);
 
-        float font_downscale_factor = 2; // loading the font at x-times size, allows increasing font size up to the scale factor, without upscaling artifacts.
-        Font font = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, font_downscale_factor*menu_font_size, NULL, 0);
-        RL_FREE(ttf_font_data);
-        GuiSetStyle(DEFAULT, TEXT_SPACING, 0);
-    #else
-        Font font = GetFontDefault();
-    #endif // DISABLE_CUSTOM_FONT
+    const int FONT_LEVELS = 3;
+    Font fonts[FONT_LEVELS]; // 0.5x, 1.0x and 2.0x font size
 
-    if (IsFontReady(font)){
-        GuiSetFont(font);
-    }
+    float font_downscale_factor = 2; // loading the font at x-times size, allows increasing font size up to the scale factor, without upscaling artifacts.
+    fonts[0] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 0.5*DEFAULT_FONT_SIZE, NULL, 0);
+    fonts[1] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 1.0*DEFAULT_FONT_SIZE, NULL, 0);
+    fonts[2] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 2.0*DEFAULT_FONT_SIZE, NULL, 0);
+    RL_FREE(ttf_font_data);
+    GuiSetStyle(DEFAULT, TEXT_SPACING, 0);
+    font = fonts[1];
+#else
+    font = GetFontDefault();
+#endif // DISABLE_CUSTOM_FONT
 
     bool forceWindowResize = true;
     bool forceMenuResize = true;
@@ -283,6 +285,16 @@ int main(int argc, char **argv){
             forceMenuResize = false;
             forceImageResize = true;
             // TODO: move parameters to struct?
+
+            #ifndef DISABLE_CUSTOM_FONT
+                // chose most fitting font resolution, avoid upscaling.
+                if (2*menu_font_size <= DEFAULT_FONT_SIZE) { font = fonts[0]; }
+                else if (menu_font_size > DEFAULT_FONT_SIZE) { font = fonts[2]; }
+                else { font = fonts[1]; }
+            #endif //DISABLE_CUSTOM_FONT
+
+            GuiSetFont(font);
+            GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
             menu_width = 20*menu_font_size/3; // allow font size to force a minimum width
             menu_padding = menu_width / 10;
             menu_content_width = menu_width - 2*menu_padding;
@@ -344,8 +356,8 @@ int main(int argc, char **argv){
                         case KEY_S: if(isCtrlDown) canvas_save_as_image(&canvas, name_field); break;
                         case KEY_ESCAPE: cursor = CURSOR_DEFAULT; break;
                         case KEY_HOME: forceWindowResize = true; break; // this causes the canvas to be centered again.
-                        case KEY_KP_ADD: {setFontSize(&menu_font_size, menu_font_size + 1); forceMenuResize = true;} break;
-                        case KEY_KP_SUBTRACT: {setFontSize(&menu_font_size, menu_font_size - 1); forceMenuResize = true;} break;
+                        case KEY_KP_ADD: {menu_font_size += 1; forceMenuResize = true;} break;
+                        case KEY_KP_SUBTRACT: {menu_font_size -= 1; forceMenuResize = true;} break;
                     }
                 }
 
@@ -530,6 +542,11 @@ int main(int argc, char **argv){
     }
 
     canvas_free(&canvas);
+#ifndef DISABLE_CUSTOM_FONT
+    for (int i = 0; i < FONT_LEVELS; i++){
+        UnloadFont(fonts[i]);
+    }
+#endif //DISABLE_CUSTOM_FONT
     CloseWindow();
 }
 
