@@ -84,7 +84,8 @@ void toolToggleButton(const char *text, enum CURSOR_MODE *cursor, enum CURSOR_MO
         DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
     }
     // TODO: icon should scale with font size.
-    GuiDrawIcon(iconId, h_padding + total_width - font_size, y_position, 2, WHITE);
+    const int icon_height = 16;
+    GuiDrawIcon(iconId, h_padding + total_width - font_size, y_position, roundf(font_size/(float)icon_height), WHITE);
 }
 
 // returns > 0  on resize
@@ -379,6 +380,7 @@ int main(int argc, char **argv){
         }
 
         // draw menu
+        DrawRectangle(0, 0, menu_width, GetScreenHeight(), ColorAlpha(FAV_COLOR, 0.2));
         DrawLine(menu_width, 0, menu_width, GetScreenHeight(), GRAY);
 
         // color picker
@@ -433,7 +435,7 @@ int main(int argc, char **argv){
         toolToggleButton("pipette", &cursor, CURSOR_PIPETTE, 27, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
         item++;
-        toolToggleButton("color fill", &cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
+        toolToggleButton("fill", &cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
         item++;
         // grid checkbox
