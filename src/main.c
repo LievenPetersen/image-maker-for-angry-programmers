@@ -34,6 +34,10 @@
 
 #include "canvas.h"
 
+#ifndef DISABLE_CUSTOM_FONT
+    #include "font.h"
+#endif //DISABLE_CUSTOM_FONT
+
 #define MAX_NAME_FIELD_SIZE 200
 
 #define MIN(a, b) (a<b? (a) : (b))
@@ -102,6 +106,11 @@ long dimensionTextBox(const Rectangle bounds, char *str_value, const size_t str_
         }
     }
     return result;
+}
+
+void setFontSize(int *font_size, unsigned int new_font_size){
+    *font_size = new_font_size;
+    GuiSetStyle(DEFAULT, TEXT_SIZE, *font_size);
 }
 
 Color HSVToColor(Vector3 hsv, unsigned char alpha){
@@ -221,6 +230,23 @@ int main(int argc, char **argv){
 
     GuiSetStyle(DEFAULT, BACKGROUND_COLOR, 0x181818FF);
 
+    // load custom font
+    #ifndef DISABLE_CUSTOM_FONT
+        // The font is compressed and encoded into an array.
+        int ttf_font_data_size = 0;
+        unsigned char *ttf_font_data = DecompressData((unsigned char*)COMPRESSED_TTF_FONT, COMPRESSED_TTF_FONT_SIZE, &ttf_font_data_size);
+
+        float font_downscale_factor = 2; // loading the font at x-times size, allows increasing font size up to the scale factor, without upscaling artifacts.
+        Font font = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, font_downscale_factor*menu_font_size, NULL, 0);
+        RL_FREE(ttf_font_data);
+        GuiSetStyle(DEFAULT, TEXT_SPACING, 0);
+    #else
+        Font font = GetFontDefault();
+    #endif // DISABLE_CUSTOM_FONT
+
+    if (IsFontReady(font)){
+        GuiSetFont(font);
+    }
 
     bool forceWindowResize = true;
     bool showGrid = true;
@@ -422,7 +448,7 @@ int main(int argc, char **argv){
             forceWindowResize = true;
             canvas_resize(&canvas, canvas.size, STD_COLOR); // FIXME: see if it is really a good idea to modify canvas.size. possibly introduce a different variable. Could play nicely with a resize confirmation button.
         }
-        DrawText("x", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+        DrawTextEx(font, "W", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
         // y resize textbox
         Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
@@ -432,7 +458,7 @@ int main(int argc, char **argv){
             forceWindowResize = true;
             canvas_resize(&canvas, canvas.size, STD_COLOR); // FIXME: see if it is really a good idea to modify canvas.size. possibly introduce a different variable. Could play nicely with a resize confirmation button.
         }
-        DrawText("y", menu_padding + menu_content_width + huebar_padding - menu_font_size ,options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, WHITE);
+        DrawTextEx(font, "H", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
         // lower menu
         int min_y = options_y + item*(huebar_padding+menu_font_size);
@@ -446,7 +472,7 @@ int main(int argc, char **argv){
             name_width = MAX(name_width, needed_width);
             name_width = MIN(name_width, GetScreenWidth() - 2*menu_padding);
 
-            DrawText(".png .bmp .qoi .raw", menu_padding, MAX(min_y, desired_text_box_y) - 0.6*menu_font_size, 0.6*menu_font_size, STD_COLOR);
+            DrawTextEx(font, ".png .bmp .qoi .raw", (Vector2){menu_padding, MAX(min_y, desired_text_box_y) - 0.6*menu_font_size}, 0.6*menu_font_size, 1, STD_COLOR);
         }
         if(GuiTextBox((Rectangle){menu_padding, MAX(min_y, desired_text_box_y), name_width, menu_font_size}, name_field, MAX_NAME_FIELD_SIZE, isEditingNameField)){
             isEditingNameField = !isEditingNameField;
@@ -467,7 +493,7 @@ int main(int argc, char **argv){
         // save button
         int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
         Rectangle save_rect = {menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
-        if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawText("ctrl+s", menu_width, save_rect.y + (save_rect.height - menu_font_size)/2, menu_font_size, WHITE);
+        if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(font, "ctrl+s", (Vector2){menu_width, save_rect.y + (save_rect.height - menu_font_size)/2}, menu_font_size, 1, WHITE);
         if(GuiButton(save_rect, "save")){
             canvas_save_as_image(&canvas, name_field);
         }

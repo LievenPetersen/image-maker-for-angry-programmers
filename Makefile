@@ -9,6 +9,13 @@ endif
 
 PLATFORM = -DPLATFORM_DESKTOP
 
+# options given via environment variables.
+# for ex.: 'TARGET=Windows FONT=0 make'
+OPTIONS =
+ifeq ($(FONT), 0)
+	OPTIONS += -DDISABLE_CUSTOM_FONT
+endif
+
 # flags for building imFAP
 FLAGS = -Wall -Wextra -pedantic -ggdb
 
@@ -46,11 +53,11 @@ endif
 
 # build from globally installed raylib library
 build_from_global: $(SRCS)
-	$(CC) -o $(OUTPUT) $(SRCS) $(FLAGS) -lraylib $(LIBS)
+	$(CC) -o $(OUTPUT) $(SRCS) $(FLAGS) $(OPTIONS) -lraylib $(LIBS)
 
 # build with provided version of raylib
 build: $(SRCS) $(RAY_OBJS)
-	$(CC) -o $(OUTPUT) $(SRCS) $(RAY_OBJS) -I$(RAY_PATH) $(FLAGS) $(LIBS)
+	$(CC) -o $(OUTPUT) $(SRCS) $(RAY_OBJS) -I$(RAY_PATH) $(FLAGS) $(OPTIONS) $(LIBS)
 
 clean:
 	rm -f $(OUTPUT_LIN)
