@@ -115,7 +115,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
         size_t pixel_idx = stack_pop(stack);
         pixels[pixel_idx] = new_color;
 
-        if (pixel_idx >= 1){
+        if (pixel_idx >= 1 && pixel_idx % image->width > 0){ // is not wrapping left to the previous row.
             size_t west = pixel_idx - 1;
             if (memcmp(&pixels[west], &old_color, sizeof(old_color)) == 0){
                 if (!visited[west]){
@@ -124,7 +124,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
                 }
             }
         }
-        if (pixel_idx < pixel_count - 1){
+        if (pixel_idx < pixel_count - 1 && pixel_idx % image->width < image->width - 1){ // is not wrapping right to the next row.
             size_t east = pixel_idx + 1;
             if (memcmp(&pixels[east], &old_color, sizeof(old_color)) == 0){
                 if (!visited[east]){
