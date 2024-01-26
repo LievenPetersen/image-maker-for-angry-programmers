@@ -500,6 +500,20 @@ int main(int argc, char **argv){
         }
         DrawTextEx(font, "H", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
+        // change resolution buttons
+        Rectangle first_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
+        Rectangle second_box = {menu_padding + 0.5*(menu_content_width - menu_font_size), options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
+        if(GuiButton(first_box, "#96#*2")){
+            canvas_changeResolution(&canvas, 2);
+            forceImageResize = true;
+        }
+        if(GuiButton(second_box, "#111#/2")){
+            canvas_changeResolution(&canvas, 0.5);
+            forceImageResize = true;
+        }
+
+        item++;
+
         // lower menu
         int min_y = options_y + item*(huebar_padding+menu_font_size);
         int save_button_height = menu_font_size/6*7; // slightly higher, so that parentheses fit in the box.
