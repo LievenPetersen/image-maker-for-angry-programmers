@@ -46,16 +46,16 @@ bool saveTextureAsImage(Texture2D tex, const char *path){
 }
 
 // changes image and texture to PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
-Texture2D loadImageAsTexture(Image *img){
-    ImageFormat(img, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    Texture2D buffer = LoadTextureFromImage(*img);
+Texture2D loadImageAsTexture(Image *image){
+    ImageFormat(image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    Texture2D buffer = LoadTextureFromImage(*image);
     assert(buffer.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     return buffer;
 }
 
 // replaces the existing texture and unloads it. Returns true on success.
-bool setTextureToImage(Texture2D *texture, Image *img){
-    Texture2D new_buffer = loadImageAsTexture(img);
+bool setTextureToImage(Texture2D *texture, Image *image){
+    Texture2D new_buffer = loadImageAsTexture(image);
     if (!IsTextureReady(new_buffer)){
         UnloadTexture(new_buffer);
         // TODO: fail operation
@@ -186,13 +186,18 @@ Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
 }
 
 void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
-    Image img = canvas_getContent(canvas);
-    ImageResizeCanvasOwn(&img, new_size.x, new_size.y, 0, 0, fill);
-    if(setTextureToImage(&canvas->tex, &img)){
-        canvas->size.x = new_size.x;
-        canvas->size.y = new_size.y;
-    }
-    UnloadImage(img);
+    Image image = canvas_getContent(canvas);
+    ImageResizeCanvasOwn(&image, new_size.x, new_size.y, 0, 0, fill);
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
+}
+
+// factor > 1 increases resolution, factor < 1 decreases resolution.
+void canvas_changeResolution(canvas_t *canvas, float factor){
+    Image image = canvas_getContent(canvas);
+    ImageResizeNN(&image, factor*image.width, factor*image.height); // seems to just use top left corner when down-scaling 0.5x to determine color??
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
 }
 
 void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
