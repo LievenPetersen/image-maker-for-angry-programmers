@@ -62,6 +62,11 @@ Vector2 RectangleCenter(Rectangle rect){
     return (Vector2){rect.x + rect.width/2.0f, rect.y + rect.height/2.0f};
 }
 
+Vector2 Vector2FloorPositive(Vector2 vec){
+    // this might be incorrect for negative numbers
+    return (Vector2){(float)(int)vec.x, (float)(int)vec.y};
+}
+
 bool isSupportedImageFormat(const char *filePath){
     const char *VALID_EXTENSIONS = ".png;.bmp;.qoi;.raw"; //.tga;.jpg;.jpeg"; // .tga and .jpg don't work for some reason
     return IsFileExtension(filePath, VALID_EXTENSIONS);
@@ -258,6 +263,7 @@ int main(int argc, char **argv){
     bool showGrid = true;
 
     bool isMouseDrawing = false;
+    Vector2 prev_pixel = {0};
 
     // this could possibly be encapsulated. Any change in floating scale requires scale to be set as well.
     float _floating_scale = 0; // used to affect scale. To enable small changes a float is needed.
@@ -322,15 +328,21 @@ int main(int argc, char **argv){
             bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
             bool isHoveringImage = !isHoveringMenu && CheckCollisionPointRec(GetMousePosition(), image_bounds);
 
-            // Disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage) isMouseDrawing = cursor == CURSOR_DEFAULT;
+            // Detect start of pixel drawing mode
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage){
+                isMouseDrawing = cursor == CURSOR_DEFAULT;
+                prev_pixel.x = -1; // set to out of bounds, so that any valid pixel is different from it.
+            }
 
             // detect canvas mouse down
             if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && isHoveringImage){
-                Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
+                Vector2 pixel = Vector2FloorPositive(Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale));
                 // set pixel
                 if (cursor == CURSOR_DEFAULT && isMouseDrawing){
-                    canvas_blendPixel(&canvas, pixel, active_color.rgba);
+                    if (pixel.x != prev_pixel.x || pixel.y != prev_pixel.y){
+                        canvas_blendPixel(&canvas, pixel, active_color.rgba);
+                        prev_pixel = pixel;
+                    }
                 }
                 // pick color with pipette (only on press, not continuously)
                 if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
