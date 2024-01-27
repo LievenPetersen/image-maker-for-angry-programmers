@@ -124,7 +124,7 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
                 }
             }
         }
-        if (pixel_idx < pixel_count - 1 && pixel_idx % image->width < image->width - 1){ // is not wrapping right to the next row.
+        if (pixel_idx < pixel_count - 1 && (pixel_idx % image->width) + 1 < (size_t)image->width){ // is not wrapping right to the next row.
             size_t east = pixel_idx + 1;
             if (memcmp(&pixels[east], &old_color, sizeof(old_color)) == 0){
                 if (!visited[east]){

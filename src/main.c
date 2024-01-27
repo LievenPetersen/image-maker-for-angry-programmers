@@ -245,7 +245,6 @@ int main(int argc, char **argv){
     const int FONT_LEVELS = 3;
     Font fonts[FONT_LEVELS]; // 0.5x, 1.0x and 2.0x font size
 
-    float font_downscale_factor = 2; // loading the font at x-times size, allows increasing font size up to the scale factor, without upscaling artifacts.
     fonts[0] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 0.5*DEFAULT_FONT_SIZE, NULL, 0);
     fonts[1] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 1.0*DEFAULT_FONT_SIZE, NULL, 0);
     fonts[2] = LoadFontFromMemory(".ttf", ttf_font_data, ttf_font_data_size, 2.0*DEFAULT_FONT_SIZE, NULL, 0);
