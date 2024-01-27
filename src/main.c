@@ -330,7 +330,7 @@ int main(int argc, char **argv){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
                 if (cursor == CURSOR_DEFAULT && isMouseDrawing){
-                    canvas_setPixel(&canvas, pixel, active_color.rgba);
+                    canvas_blendPixel(&canvas, pixel, active_color.rgba);
                 }
                 // pick color with pipette (only on press, not continuously)
                 if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){

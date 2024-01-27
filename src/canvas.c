@@ -165,8 +165,13 @@ void canvas_setToImage(canvas_t *canvas, Image image){
     }
 }
 
-void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
-    UpdateTextureRec(canvas->tex, (Rectangle){pixel.x, pixel.y, 1, 1}, &color);
+void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
+    Color new_color = color;
+    if (color.a < 255){
+        Color old_color = canvas_getPixel(canvas, pixel); // TODO: cache image!
+        new_color = ColorAlphaBlend(old_color, color, WHITE);
+    }
+    UpdateTextureRec(canvas->tex, (Rectangle){pixel.x, pixel.y, 1, 1}, &new_color);
 }
 
 Image canvas_getContent(canvas_t *canvas){
