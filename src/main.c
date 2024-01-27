@@ -257,7 +257,7 @@ int main(int argc, char **argv){
 
     bool showGrid = true;
 
-    bool mousePressStartedInDefaultMode = false;
+    bool isMouseDrawing = false;
 
     // this could possibly be encapsulated. Any change in floating scale requires scale to be set as well.
     float _floating_scale = 0; // used to affect scale. To enable small changes a float is needed.
@@ -317,16 +317,19 @@ int main(int argc, char **argv){
         }
         // handle mouse and keyboard input
         if (hasImage && !isEditingNameField){ // name field can overlap with the canvas
-            // Disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) mousePressStartedInDefaultMode = cursor == CURSOR_DEFAULT;
 
-            // detect canvas click
             Rectangle image_bounds = {image_position.x, image_position.y, canvas.size.x*scale, canvas.size.y*scale};
             bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
-            if (!isHoveringMenu && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), image_bounds)){
+            bool isHoveringImage = !isHoveringMenu && CheckCollisionPointRec(GetMousePosition(), image_bounds);
+
+            // Disable set pixel on button down, if a tool was pressed. (to avoid set pixel on tool clicks)
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage) isMouseDrawing = cursor == CURSOR_DEFAULT;
+
+            // detect canvas mouse down
+            if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && isHoveringImage){
                 Vector2 pixel = Vector2Scale(Vector2Subtract(GetMousePosition(), (Vector2){image_bounds.x, image_bounds.y}), 1.0f/(float)scale);
                 // set pixel
-                if (cursor == CURSOR_DEFAULT && mousePressStartedInDefaultMode){
+                if (cursor == CURSOR_DEFAULT && isMouseDrawing){
                     canvas_setPixel(&canvas, pixel, active_color.rgba);
                 }
                 // pick color with pipette (only on press, not continuously)
