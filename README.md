@@ -2,11 +2,15 @@
 
 The idea is to provide a simple image making tool with relatively short loading times for slow potatoes.
 
+
 - uses raylib + raygui
+- runs on Linux (/Unix?) and Windows
 - all dependencies are included
-- to build:
+- **build**:
   - `make`: build with provided raylib version.
   - use `make build_from_global` to use globally installed raylib version.
+
+  (make is not configured to run on Windows)
 - to run: `make run` or `./imfap`
 
 ---
