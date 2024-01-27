@@ -479,7 +479,7 @@ int main(int argc, char **argv){
         GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
 
         // x resize textbox
-        sprintf(x_field, "%d", (int)canvas.size.x); // TODO: maybe only reprint this if canvas size changes.
+        if (!isEditingXField) sprintf(x_field, "%d", (int)canvas.size.x); // TODO: maybe only reprint this if canvas size changes.
         Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         long res = dimensionTextBox(x_box, x_field, DIM_STRLEN, canvas.size.x, &isEditingXField);
         if (res > 0){
@@ -491,7 +491,7 @@ int main(int argc, char **argv){
         DrawTextEx(font, "W", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
         // y resize textbox
-        sprintf(y_field, "%d", (int)canvas.size.y); // TODO: maybe only reprint this if canvas size changes.
+        if (!isEditingYField) sprintf(y_field, "%d", (int)canvas.size.y); // TODO: maybe only reprint this if canvas size changes.
         Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         res = dimensionTextBox(y_box, y_field, DIM_STRLEN, canvas.size.y, &isEditingYField);
         if (res > 0){
