@@ -49,6 +49,7 @@
 
 #define FAV_COLOR ((Color){0x18, 0x18, 0x18, 0xFF}) // sorry, but AA is a bit impractical
 #define STD_COLOR ((Color){0xFF, 0x00, 0x00, 0xFF})
+#define DFT_COLOR ((Color){0xFF, 0xD7, 0x00, 0xFF})
 
 
 enum CURSOR_MODE{
@@ -269,7 +270,7 @@ int main(int argc, char **argv){
     // Track hsv + alpha instead of rgba,
     // because rgba can only store lossy hue values which leads to color-picker jitters when color approaches white or black.
     color_t active_color = {0};
-    setFromRGBA(&active_color, FAV_COLOR); // important to initialize from rgba, because HSV does not supply alpha information.
+    setFromRGBA(&active_color, DFT_COLOR); // important to initialize from rgba, because HSV does not supply alpha information.
 
     enum CURSOR_MODE cursor = CURSOR_DEFAULT;
 
