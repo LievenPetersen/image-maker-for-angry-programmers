@@ -1,7 +1,11 @@
-# primitive pixel art tool
+# basic pixel art tool
+
+The idea is to provide a simple image making tool with relatively short loading times for slow potatoes.
+
 - uses raylib + raygui
+- all dependencies are included
 - to build:
-  - `make` build with provided raylib version.
+  - `make`: build with provided raylib version.
   - use `make build_from_global` to use globally installed raylib version.
 - to run: `make run` or `./imfap`
 
