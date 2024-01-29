@@ -25,6 +25,7 @@
 // all fields are readonly
 typedef struct canvas_t canvas_t;
 
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color);
 void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color);
 void canvas_setToImage(canvas_t *canvas, Image image);
 void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood);

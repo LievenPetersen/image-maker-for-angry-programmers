@@ -29,9 +29,18 @@
 
 #include "canvas.h"
 
+typedef struct pixel_t {
+    Vector2 pos;
+    Color color;
+} pixel_t;
+
+
 struct canvas_t{
+    Image buffer;
     Vector2 size;
-    Texture2D tex;
+    Texture2D texture;
+    pixel_t *draw_queue;
+    bool replace;
 };
 
 bool saveTextureAsImage(Texture2D tex, const char *path){
@@ -162,14 +171,34 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
 
 
 void canvas_setToImage(canvas_t *canvas, Image image){
-    if (setTextureToImage(&canvas->tex, &image)){
-        canvas->size.x = image.width;
-        canvas->size.y = image.height;
+    UnloadImage(canvas->buffer);
+    canvas->buffer = ImageCopy(image);
+    canvas->replace = true;
+    canvas->size.x = canvas->buffer.width;
+    canvas->size.y = canvas->buffer.height;
+    // empty the draw queue, as it is overwritten by this
+    while(stack_size(canvas->draw_queue) > 0) (void)stack_pop(canvas->draw_queue);
+}
+
+Texture2D canvas_nextFrame(canvas_t *canvas){
+    if (canvas->replace){
+        setTextureToImage(&canvas->texture, &canvas->buffer);
+        // this should already have happened, but just to make sure
+        canvas->size.x = canvas->buffer.width;
+        canvas->size.y = canvas->buffer.height;
+        canvas->replace = false;
     }
+    while(stack_size(canvas->draw_queue) > 0){
+        pixel_t pixel = stack_pop(canvas->draw_queue);
+        Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
+        UpdateTextureRec(canvas->texture, rect, &pixel.color);
+    }
+    return canvas->texture;
 }
 
 canvas_t *canvas_new(Image content){
-    canvas_t *new = malloc(sizeof(*new));
+    canvas_t *new = calloc(1, sizeof(*new));
+    stack_reserve_capacity(new->draw_queue, 3);
     canvas_setToImage(new, content);
     return new;
 }
@@ -180,31 +209,28 @@ void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
         Color old_color = canvas_getPixel(canvas, pixel); // TODO: cache image!
         new_color = ColorAlphaBlend(old_color, color, WHITE);
     }
-    UpdateTextureRec(canvas->tex, (Rectangle){pixel.x, pixel.y, 1, 1}, &new_color);
+    canvas_setPixel(canvas, pixel, new_color);
 }
 
-Texture2D canvas_nextFrame(canvas_t *canvas){
-    return canvas->tex;
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
+    ImageDrawPixel(&canvas->buffer, pixel.x, pixel.y, color);
+    stack_push(canvas->draw_queue, (pixel_t){pixel, color});
 }
 
-Image canvas_getContent(canvas_t *canvas){
-    return LoadImageFromTexture(canvas->tex);
+inline Image canvas_getContent(canvas_t *canvas){
+    return ImageCopy(canvas->buffer); // could avoid this copy by redoing the logic of all tool functions.
 }
 
 void canvas_saveAsImage(canvas_t *canvas, const char *path){
-    saveTextureAsImage(canvas->tex, path);
+    saveTextureAsImage(canvas->texture, path);
 }
 
 inline Vector2 canvas_getSize(canvas_t *canvas){
     return canvas->size;
 }
 
-Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
-    // TODO: cache image?
-    Image canvas_content = canvas_getContent(canvas);
-    Color pixel_color = GetImageColor(canvas_content, pixel.x, pixel.y);
-    UnloadImage(canvas_content);
-    return pixel_color;
+inline Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
+    return GetImageColor(canvas->buffer, pixel.x, pixel.y);
 }
 
 void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
@@ -223,13 +249,14 @@ void canvas_changeResolution(canvas_t *canvas, float factor){
 }
 
 void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
-    Image canvas_content = canvas_getContent(canvas); // canvas content could be loaded as soon as pipette mode activates, if responsiveness is an issue.
-    imageColorFlood(&canvas_content, source, flood);
-    canvas_setToImage(canvas, canvas_content);
-    UnloadImage(canvas_content);
+    Image image = canvas_getContent(canvas);
+    imageColorFlood(&image, source, flood);
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
 }
 
 void canvas_free(canvas_t *canvas){
-    UnloadTexture(canvas->tex);
+    UnloadTexture(canvas->texture);
+    stack_free(canvas->draw_queue);
     free(canvas);
 }
