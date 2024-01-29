@@ -158,7 +158,10 @@ int main(int argc, char **argv){
 
     // -- initialize application --
 
-    canvas_t canvas = {0};
+    Image starter_image = GenImageColor(8, 8, STD_COLOR);
+    canvas_t *canvas = canvas_new(starter_image);
+    UnloadImage(starter_image);
+
     bool hasImage = false;
 
     char name_field[MAX_NAME_FIELD_SIZE];
@@ -172,7 +175,7 @@ int main(int argc, char **argv){
             UnloadImage(img);
             return 1;
         }
-        canvas_setToImage(&canvas, img);
+        canvas_setToImage(canvas, img);
         if (strnlen(argv[1], MAX_NAME_FIELD_SIZE) == MAX_NAME_FIELD_SIZE){
             name_field[MAX_NAME_FIELD_SIZE-1] = 0; // brutal approach to make string fit.
             // TODO: more graceful solution, that doesn't rip out the postfix.
@@ -186,12 +189,9 @@ int main(int argc, char **argv){
 
     // generate standard 8x8 image
     if (!hasImage){
-        Image img = GenImageColor(8, 8, STD_COLOR);
-        canvas_setToImage(&canvas, img);
         sprintf(name_field, "out.png");
 
         hasImage = true;
-        UnloadImage(img);
     }
     sprintf(name_field_old, "%s", name_field);
 
@@ -313,9 +313,10 @@ int main(int argc, char **argv){
                 // TODO: fit image to rect
                 // TODO support images bigger than drawingBounds
                 // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
-                _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas.size.x, drawingBounds.height / canvas.size.y)));
+                Vector2 canvas_size = canvas_getSize(canvas);
+                _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas_size.x, drawingBounds.height / canvas_size.y)));
                 scale = (int)_floating_scale;
-                image_position = (Vector2){drawingBounds.width - canvas.size.x*scale, drawingBounds.height - canvas.size.y*scale};
+                image_position = (Vector2){drawingBounds.width - canvas_size.x*scale, drawingBounds.height - canvas_size.y*scale};
                 image_position = Vector2Scale(image_position, 0.5);
                 image_position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, image_position);
             }
@@ -323,7 +324,7 @@ int main(int argc, char **argv){
         // handle mouse and keyboard input
         if (hasImage && !isEditingNameField){ // name field can overlap with the canvas
 
-            Rectangle image_bounds = {image_position.x, image_position.y, canvas.size.x*scale, canvas.size.y*scale};
+            Rectangle image_bounds = {image_position.x, image_position.y, canvas_getSize(canvas).x*scale, canvas_getSize(canvas).y*scale};
             bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
             bool isHoveringImage = !isHoveringMenu && CheckCollisionPointRec(GetMousePosition(), image_bounds);
 
@@ -339,20 +340,20 @@ int main(int argc, char **argv){
                 // set pixel
                 if (cursor == CURSOR_DEFAULT && isMouseDrawing){
                     if (pixel.x != prev_pixel.x || pixel.y != prev_pixel.y){
-                        canvas_blendPixel(&canvas, pixel, active_color.rgba);
+                        canvas_blendPixel(canvas, pixel, active_color.rgba);
                         prev_pixel = pixel;
                     }
                 }
                 // pick color with pipette (only on press, not continuously)
                 if (cursor == CURSOR_PIPETTE && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
-                    Color pixel_color = canvas_getPixel(&canvas, pixel);
+                    Color pixel_color = canvas_getPixel(canvas, pixel);
                     setFromRGBA(&active_color, pixel_color);
                 }
                 // color fill
                 else if (cursor == CURSOR_COLOR_FILL && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     cursor = CURSOR_DEFAULT;
-                    canvas_colorFlood(&canvas, pixel, active_color.rgba);
+                    canvas_colorFlood(canvas, pixel, active_color.rgba);
                 }
             }
             // shortcuts
@@ -366,7 +367,7 @@ int main(int argc, char **argv){
                         case KEY_P: toggleTool(&cursor, CURSOR_PIPETTE); break;
                         case KEY_F: toggleTool(&cursor, CURSOR_COLOR_FILL); break;
                         case KEY_C: if(isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); break; // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
-                        case KEY_S: if(isCtrlDown) canvas_save_as_image(&canvas, name_field); break;
+                        case KEY_S: if(isCtrlDown) canvas_saveAsImage(canvas, name_field); break;
                         case KEY_ESCAPE: cursor = CURSOR_DEFAULT; break;
                         case KEY_HOME: forceWindowResize = true; break; // this causes the canvas to be centered again.
                         case KEY_KP_ADD: {menu_font_size += 1; forceMenuResize = true;} break;
@@ -404,7 +405,7 @@ int main(int argc, char **argv){
             }
             // after all moving functions are done:
             // ensure that part of the canvas is still in the draw area.
-            Vector2 image_size = Vector2Scale(canvas.size, (int)_floating_scale);
+            Vector2 image_size = Vector2Scale(canvas_getSize(canvas), (int)_floating_scale);
             if (image_position.x + image_size.x < drawingBounds.x + scale) image_position.x = drawingBounds.x - image_size.x + scale;
             if (image_position.y + image_size.y < drawingBounds.y + scale) image_position.y = drawingBounds.y - image_size.y + scale;
             if (drawingBounds.x + drawingBounds.width  < image_position.x + scale) image_position.x = drawingBounds.x + drawingBounds.width - scale;
@@ -416,18 +417,18 @@ int main(int argc, char **argv){
 
         // draw image
         Vector2 floored_image_position = {(int)image_position.x, (int)image_position.y}; // image_position is not an integer value at this point, which can cause slight distortions when drawing. outright flooring it degrades zoom precision.
-        DrawTextureEx(canvas.tex, floored_image_position, 0, scale, WHITE); // use int scale, so that every pixel of the texture is drawn as the same multiple. This is important for drawing the grid.
+        DrawTextureEx(canvas_nextFrame(canvas), floored_image_position, 0, scale, WHITE); // use int scale, so that every pixel of the texture is drawn as the same multiple. This is important for drawing the grid.
 
         // draw grid
         const Color GRID_COLOR = DARKGRAY;
         if(showGrid && scale >= 3){
-            for (int i = 1; i < canvas.size.x; i++){
-                DrawLineEx((Vector2){floored_image_position.x + i*scale, floored_image_position.y}, (Vector2){floored_image_position.x + i*scale, floored_image_position.y + canvas.size.y*scale}, 1, GRID_COLOR);
+            for (int i = 1; i < canvas_getSize(canvas).x; i++){
+                DrawLineEx((Vector2){floored_image_position.x + i*scale, floored_image_position.y}, (Vector2){floored_image_position.x + i*scale, floored_image_position.y + canvas_getSize(canvas).y*scale}, 1, GRID_COLOR);
             }
-            for (int j = 1; j < canvas.size.y; j++){
-                DrawLineEx((Vector2){floored_image_position.x, floored_image_position.y + j*scale}, (Vector2){floored_image_position.x + canvas.size.x*scale, floored_image_position.y + j*scale}, 1, GRID_COLOR);
+            for (int j = 1; j < canvas_getSize(canvas).y; j++){
+                DrawLineEx((Vector2){floored_image_position.x, floored_image_position.y + j*scale}, (Vector2){floored_image_position.x + canvas_getSize(canvas).x*scale, floored_image_position.y + j*scale}, 1, GRID_COLOR);
             }
-            DrawRectangleLines(floored_image_position.x-1, floored_image_position.y-1, canvas.size.x*scale+2, canvas.size.y*scale+2, GRID_COLOR);
+            DrawRectangleLines(floored_image_position.x-1, floored_image_position.y-1, canvas_getSize(canvas).x*scale+2, canvas_getSize(canvas).y*scale+2, GRID_COLOR);
         }
 
         // draw menu
@@ -493,25 +494,27 @@ int main(int argc, char **argv){
         GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &showGrid);
 
         // x resize textbox
-        if (!isEditingXField) sprintf(x_field, "%d", (int)canvas.size.x); // TODO: maybe only reprint this if canvas size changes.
+        if (!isEditingXField) sprintf(x_field, "%d", (int)canvas_getSize(canvas).x); // TODO: maybe only reprint this if canvas size changes.
         Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        long res = dimensionTextBox(x_box, x_field, DIM_STRLEN, canvas.size.x, &isEditingXField);
+        long res = dimensionTextBox(x_box, x_field, DIM_STRLEN, canvas_getSize(canvas).x, &isEditingXField);
         if (res > 0){
             // TODO: fix flicker on resize? (caused by unloading the currently drawn texture)
-            canvas.size.x = res;
+            Vector2 new_size = canvas_getSize(canvas);
+            new_size.x = res;
             forceWindowResize = true;
-            canvas_resize(&canvas, canvas.size, STD_COLOR); // FIXME: see if it is really a good idea to modify canvas.size. possibly introduce a different variable. Could play nicely with a resize confirmation button.
+            canvas_resize(canvas, new_size, STD_COLOR);
         }
         DrawTextEx(font, "W", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
         // y resize textbox
-        if (!isEditingYField) sprintf(y_field, "%d", (int)canvas.size.y); // TODO: maybe only reprint this if canvas size changes.
+        if (!isEditingYField) sprintf(y_field, "%d", (int)canvas_getSize(canvas).y); // TODO: maybe only reprint this if canvas size changes.
         Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
-        res = dimensionTextBox(y_box, y_field, DIM_STRLEN, canvas.size.y, &isEditingYField);
+        res = dimensionTextBox(y_box, y_field, DIM_STRLEN, canvas_getSize(canvas).y, &isEditingYField);
         if (res > 0){
-            canvas.size.y = res;
+            Vector2 new_size = canvas_getSize(canvas);
+            new_size.y = res;
             forceWindowResize = true;
-            canvas_resize(&canvas, canvas.size, STD_COLOR); // FIXME: see if it is really a good idea to modify canvas.size. possibly introduce a different variable. Could play nicely with a resize confirmation button.
+            canvas_resize(canvas, new_size, STD_COLOR);
         }
         DrawTextEx(font, "H", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
 
@@ -519,11 +522,11 @@ int main(int argc, char **argv){
         Rectangle first_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
         Rectangle second_box = {menu_padding + 0.5*(menu_content_width - menu_font_size), options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
         if(GuiButton(first_box, "#96#*2")){
-            canvas_changeResolution(&canvas, 2);
+            canvas_changeResolution(canvas, 2);
             forceImageResize = true;
         }
         if(GuiButton(second_box, "#111#/2")){
-            canvas_changeResolution(&canvas, 0.5);
+            canvas_changeResolution(canvas, 0.5);
             forceImageResize = true;
         }
 
@@ -564,13 +567,13 @@ int main(int argc, char **argv){
         Rectangle save_rect = {menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
         if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(font, "ctrl+s", (Vector2){menu_width, save_rect.y + (save_rect.height - menu_font_size)/2}, menu_font_size, 1, WHITE);
         if(GuiButton(save_rect, "save")){
-            canvas_save_as_image(&canvas, name_field);
+            canvas_saveAsImage(canvas, name_field);
         }
 
         EndDrawing();
     }
 
-    canvas_free(&canvas);
+    canvas_free(canvas);
 #ifndef DISABLE_CUSTOM_FONT
     for (int i = 0; i < FONT_LEVELS; i++){
         UnloadFont(fonts[i]);

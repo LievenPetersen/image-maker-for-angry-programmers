@@ -29,7 +29,10 @@
 
 #include "canvas.h"
 
-
+struct canvas_t{
+    Vector2 size;
+    Texture2D tex;
+};
 
 bool saveTextureAsImage(Texture2D tex, const char *path){
     Image result = LoadImageFromTexture(tex);
@@ -165,6 +168,12 @@ void canvas_setToImage(canvas_t *canvas, Image image){
     }
 }
 
+canvas_t *canvas_new(Image content){
+    canvas_t *new = malloc(sizeof(*new));
+    canvas_setToImage(new, content);
+    return new;
+}
+
 void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
     Color new_color = color;
     if (color.a < 255){
@@ -174,12 +183,20 @@ void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
     UpdateTextureRec(canvas->tex, (Rectangle){pixel.x, pixel.y, 1, 1}, &new_color);
 }
 
+Texture2D canvas_nextFrame(canvas_t *canvas){
+    return canvas->tex;
+}
+
 Image canvas_getContent(canvas_t *canvas){
     return LoadImageFromTexture(canvas->tex);
 }
 
-void canvas_save_as_image(canvas_t *canvas, const char *path){
+void canvas_saveAsImage(canvas_t *canvas, const char *path){
     saveTextureAsImage(canvas->tex, path);
+}
+
+inline Vector2 canvas_getSize(canvas_t *canvas){
+    return canvas->size;
 }
 
 Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
@@ -214,4 +231,5 @@ void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
 
 void canvas_free(canvas_t *canvas){
     UnloadTexture(canvas->tex);
+    free(canvas);
 }

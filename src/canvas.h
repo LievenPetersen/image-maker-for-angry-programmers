@@ -23,10 +23,7 @@
 #include "external/raylib/src/raylib.h"
 
 // all fields are readonly
-typedef struct canvas_t{
-    Vector2 size;
-    Texture2D tex;
-}canvas_t;
+typedef struct canvas_t canvas_t;
 
 void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color);
 void canvas_setToImage(canvas_t *canvas, Image image);
@@ -36,9 +33,14 @@ void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill);
 // factor > 1 increases resolution, factor < 1 decreases resolution.
 void canvas_changeResolution(canvas_t *canvas, float factor);
 
+// do not modify or unload the returned texture. it is still owned by the canvas!
+Texture2D canvas_nextFrame(canvas_t *canvas);
+
 Image canvas_getContent(canvas_t *canvas);
+Vector2 canvas_getSize(canvas_t *canvas);
 Color canvas_getPixel(canvas_t *canvas, Vector2 pixel);
 
-void canvas_save_as_image(canvas_t *canvas, const char *path);
+void canvas_saveAsImage(canvas_t *canvas, const char *path);
 
+canvas_t *canvas_new(Image content);
 void canvas_free(canvas_t *canvas);
