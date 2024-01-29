@@ -498,7 +498,6 @@ int main(int argc, char **argv){
         Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
         long res = dimensionTextBox(x_box, x_field, DIM_STRLEN, canvas_getSize(canvas).x, &isEditingXField);
         if (res > 0){
-            // TODO: fix flicker on resize? (caused by unloading the currently drawn texture)
             Vector2 new_size = canvas_getSize(canvas);
             new_size.x = res;
             forceWindowResize = true;
