@@ -29,11 +29,16 @@
 
 #include "canvas.h"
 
+Texture2D loadImageAsTexture(Image *image);
+bool setTextureToImage(Texture2D *texture, Image *image);
+void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color fill);
+void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color);
+
+
 typedef struct pixel_t {
     Vector2 pos;
     Color color;
 } pixel_t;
-
 
 struct canvas_t{
     Image buffer;
@@ -43,19 +48,111 @@ struct canvas_t{
     bool replace;
 };
 
-bool saveTextureAsImage(Texture2D tex, const char *path){
-    Image result = LoadImageFromTexture(tex);
+// --- API ---
 
-    bool success = IsImageReady(result)
-        && ExportImage(result, path);
-
-    UnloadImage(result);
-
-    if (!success){
-        printf("Error while saving image!\n");
-    }
-    return success;
+canvas_t *canvas_new(Image content){
+    canvas_t *new = calloc(1, sizeof(*new));
+    stack_reserve_capacity(new->draw_queue, 3);
+    canvas_setToImage(new, content);
+    return new;
 }
+
+void canvas_free(canvas_t *canvas){
+    UnloadTexture(canvas->texture);
+    stack_free(canvas->draw_queue);
+    free(canvas);
+}
+
+
+// functions interacting directly with canvas buffer and texture
+
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
+    ImageDrawPixel(&canvas->buffer, pixel.x, pixel.y, color);
+    stack_push(canvas->draw_queue, (pixel_t){pixel, color});
+}
+
+void canvas_setToImage(canvas_t *canvas, Image image){
+    UnloadImage(canvas->buffer);
+    canvas->buffer = ImageCopy(image);
+    canvas->replace = true;
+    canvas->size.x = canvas->buffer.width;
+    canvas->size.y = canvas->buffer.height;
+    // empty the draw queue, as it is overwritten by this
+    while(stack_size(canvas->draw_queue) > 0) (void)stack_pop(canvas->draw_queue);
+}
+
+inline Image canvas_getContent(canvas_t *canvas){
+    return ImageCopy(canvas->buffer); // could avoid this copy by redoing the logic of all tool functions.
+}
+
+inline Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
+    return GetImageColor(canvas->buffer, pixel.x, pixel.y);
+}
+
+Texture2D canvas_nextFrame(canvas_t *canvas){
+    if (canvas->replace){
+        setTextureToImage(&canvas->texture, &canvas->buffer);
+        // this should already have happened, but just to make sure
+        canvas->size.x = canvas->buffer.width;
+        canvas->size.y = canvas->buffer.height;
+        canvas->replace = false;
+    }
+    while(stack_size(canvas->draw_queue) > 0){
+        pixel_t pixel = stack_pop(canvas->draw_queue);
+        Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
+        UpdateTextureRec(canvas->texture, rect, &pixel.color);
+    }
+    return canvas->texture;
+}
+
+bool canvas_saveAsImage(canvas_t *canvas, const char *path){
+    if (!ExportImage(canvas->buffer, path)){
+        perror("Error while saving image!\n");
+        return false;
+    }
+    return true;
+}
+
+inline Vector2 canvas_getSize(canvas_t *canvas){
+    return canvas->size;
+}
+
+
+// functions indirectly interacting with canvas struct
+
+void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
+    Color new_color = color;
+    if (color.a < 255){
+        Color old_color = canvas_getPixel(canvas, pixel); // TODO: cache image!
+        new_color = ColorAlphaBlend(old_color, color, WHITE);
+    }
+    canvas_setPixel(canvas, pixel, new_color);
+}
+
+void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
+    Image image = canvas_getContent(canvas);
+    ImageResizeCanvasOwn(&image, new_size.x, new_size.y, 0, 0, fill);
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
+}
+
+// factor > 1 increases resolution, factor < 1 decreases resolution.
+void canvas_changeResolution(canvas_t *canvas, float factor){
+    Image image = canvas_getContent(canvas);
+    ImageResizeNN(&image, factor*image.width, factor*image.height); // seems to just use top left corner when down-scaling 0.5x to determine color??
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
+}
+
+void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
+    Image image = canvas_getContent(canvas);
+    imageColorFlood(&image, source, flood);
+    canvas_setToImage(canvas, image);
+    UnloadImage(image);
+}
+
+
+// -- utility functions --
 
 // changes image and texture to PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
 Texture2D loadImageAsTexture(Image *image){
@@ -167,96 +264,4 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color){
 
     stack_free(stack);
     free(visited);
-}
-
-
-void canvas_setToImage(canvas_t *canvas, Image image){
-    UnloadImage(canvas->buffer);
-    canvas->buffer = ImageCopy(image);
-    canvas->replace = true;
-    canvas->size.x = canvas->buffer.width;
-    canvas->size.y = canvas->buffer.height;
-    // empty the draw queue, as it is overwritten by this
-    while(stack_size(canvas->draw_queue) > 0) (void)stack_pop(canvas->draw_queue);
-}
-
-Texture2D canvas_nextFrame(canvas_t *canvas){
-    if (canvas->replace){
-        setTextureToImage(&canvas->texture, &canvas->buffer);
-        // this should already have happened, but just to make sure
-        canvas->size.x = canvas->buffer.width;
-        canvas->size.y = canvas->buffer.height;
-        canvas->replace = false;
-    }
-    while(stack_size(canvas->draw_queue) > 0){
-        pixel_t pixel = stack_pop(canvas->draw_queue);
-        Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
-        UpdateTextureRec(canvas->texture, rect, &pixel.color);
-    }
-    return canvas->texture;
-}
-
-canvas_t *canvas_new(Image content){
-    canvas_t *new = calloc(1, sizeof(*new));
-    stack_reserve_capacity(new->draw_queue, 3);
-    canvas_setToImage(new, content);
-    return new;
-}
-
-void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
-    Color new_color = color;
-    if (color.a < 255){
-        Color old_color = canvas_getPixel(canvas, pixel); // TODO: cache image!
-        new_color = ColorAlphaBlend(old_color, color, WHITE);
-    }
-    canvas_setPixel(canvas, pixel, new_color);
-}
-
-void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
-    ImageDrawPixel(&canvas->buffer, pixel.x, pixel.y, color);
-    stack_push(canvas->draw_queue, (pixel_t){pixel, color});
-}
-
-inline Image canvas_getContent(canvas_t *canvas){
-    return ImageCopy(canvas->buffer); // could avoid this copy by redoing the logic of all tool functions.
-}
-
-void canvas_saveAsImage(canvas_t *canvas, const char *path){
-    saveTextureAsImage(canvas->texture, path);
-}
-
-inline Vector2 canvas_getSize(canvas_t *canvas){
-    return canvas->size;
-}
-
-inline Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
-    return GetImageColor(canvas->buffer, pixel.x, pixel.y);
-}
-
-void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill){
-    Image image = canvas_getContent(canvas);
-    ImageResizeCanvasOwn(&image, new_size.x, new_size.y, 0, 0, fill);
-    canvas_setToImage(canvas, image);
-    UnloadImage(image);
-}
-
-// factor > 1 increases resolution, factor < 1 decreases resolution.
-void canvas_changeResolution(canvas_t *canvas, float factor){
-    Image image = canvas_getContent(canvas);
-    ImageResizeNN(&image, factor*image.width, factor*image.height); // seems to just use top left corner when down-scaling 0.5x to determine color??
-    canvas_setToImage(canvas, image);
-    UnloadImage(image);
-}
-
-void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood){
-    Image image = canvas_getContent(canvas);
-    imageColorFlood(&image, source, flood);
-    canvas_setToImage(canvas, image);
-    UnloadImage(image);
-}
-
-void canvas_free(canvas_t *canvas){
-    UnloadTexture(canvas->texture);
-    stack_free(canvas->draw_queue);
-    free(canvas);
 }
