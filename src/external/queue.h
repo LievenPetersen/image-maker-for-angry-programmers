@@ -118,8 +118,27 @@ static size_t __queue_pop_tail_idx(void *queue){
     }
 }
 
+static size_t __queue_pop_head_idx(void *queue){
+    struct __queue_info *qi = __get_qi(queue);
+    if (qi->size > 0){
+        qi->size--;
+        qi->head = (qi->head - 1) % qi->capacity;
+        return qi->head;
+    } else {
+        return 0;
+    }
+}
+
 #define queue_poll(queue)  queue[__queue_pop_tail_idx(queue)]
+#define queue_pop(queue)  queue[__queue_pop_head_idx(queue)]
 
 #define queue_size(queue) (__get_qi(queue) == NULL? 0 : __get_qi(queue)->size)
+
+static void queue_clear(void *queue){
+    struct __queue_info *qi = __get_qi(queue);
+    qi->head = 0;
+    qi->tail = 0;
+    qi->size = 0;
+}
 
 #endif //__QUEUE_H
