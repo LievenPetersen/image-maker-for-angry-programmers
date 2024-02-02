@@ -26,6 +26,7 @@
 #include "external/raylib/src/raylib.h"
 
 #include "external/stack.h"
+#include "external/queue.h"
 
 #include "canvas.h"
 
@@ -52,14 +53,14 @@ struct canvas_t{
 
 canvas_t *canvas_new(Image content){
     canvas_t *new = calloc(1, sizeof(*new));
-    stack_reserve_capacity(new->draw_queue, 3);
+    queue_reserve_capacity(new->draw_queue, 3);
     canvas_setToImage(new, content);
     return new;
 }
 
 void canvas_free(canvas_t *canvas){
     UnloadTexture(canvas->texture);
-    stack_free(canvas->draw_queue);
+    queue_free(canvas->draw_queue);
     free(canvas);
 }
 
@@ -68,7 +69,7 @@ void canvas_free(canvas_t *canvas){
 
 void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
     ImageDrawPixel(&canvas->buffer, pixel.x, pixel.y, color);
-    stack_push(canvas->draw_queue, (pixel_t){pixel, color});
+    queue_push(canvas->draw_queue, (pixel_t){pixel, color});
 }
 
 void canvas_setToImage(canvas_t *canvas, Image image){
@@ -78,7 +79,7 @@ void canvas_setToImage(canvas_t *canvas, Image image){
     canvas->size.x = canvas->buffer.width;
     canvas->size.y = canvas->buffer.height;
     // empty the draw queue, as it is overwritten by this
-    while(stack_size(canvas->draw_queue) > 0) (void)stack_pop(canvas->draw_queue);
+    while(queue_size(canvas->draw_queue) > 0) (void)queue_poll(canvas->draw_queue);
 }
 
 inline Image canvas_getContent(canvas_t *canvas){
@@ -97,8 +98,8 @@ Texture2D canvas_nextFrame(canvas_t *canvas){
         canvas->size.y = canvas->buffer.height;
         canvas->replace = false;
     }
-    while(stack_size(canvas->draw_queue) > 0){
-        pixel_t pixel = stack_pop(canvas->draw_queue);
+    while(queue_size(canvas->draw_queue) > 0){
+        pixel_t pixel = queue_poll(canvas->draw_queue);
         Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
         UpdateTextureRec(canvas->texture, rect, &pixel.color);
     }
