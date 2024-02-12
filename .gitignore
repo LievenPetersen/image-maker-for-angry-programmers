@@ -3,6 +3,8 @@
 # executables
 imfap
 **.exe
+**.wasm
+**.wat
 
 # build artifacts
 *.o
