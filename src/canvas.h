@@ -38,6 +38,12 @@ Image canvas_getContent(canvas_t *canvas);
 Vector2 canvas_getSize(canvas_t *canvas);
 Color canvas_getPixel(canvas_t *canvas, Vector2 pixel);
 
+void canvas_nextPixelStroke(canvas_t *canvas);
+
+// return true if the size of the canvas changed
+bool canvas_undo(canvas_t *canvas);
+bool canvas_redo(canvas_t *canvas);
+
 void canvas_resize(canvas_t *canvas, Vector2 new_size, Color fill);
 // factor > 1 increases resolution, factor < 1 decreases resolution.
 void canvas_changeResolution(canvas_t *canvas, float factor);

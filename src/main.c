@@ -332,6 +332,7 @@ int main(int argc, char **argv){
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage){
                 isMouseDrawing = cursor == CURSOR_DEFAULT;
                 prev_pixel.x = -1; // set to out of bounds, so that any valid pixel is different from it.
+                canvas_startPixelStroke(canvas);
             }
 
             // detect canvas mouse down
@@ -358,7 +359,8 @@ int main(int argc, char **argv){
             }
             // shortcuts
             if (!isEditingHexField){
-                bool isCtrlDown = (IsKeyDown(KEY_LEFT_CONTROL)||IsKeyDown(KEY_RIGHT_CONTROL));
+                bool isCtrlDown = (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL));
+                bool isShiftDown = (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
                 // TODO: investigate if ctrl-+ ctrl-- can be detected for all +/- keys on the keyboard for all +/- keys on the keyboard. with glfw (glfwGetKeyName)
                 int pressed_key = 0;
                 while((pressed_key = GetKeyPressed())){ // a key was pressed this frame (this gets the next key in the queue, but we don't use that.)
@@ -368,6 +370,10 @@ int main(int argc, char **argv){
                         case KEY_F: toggleTool(&cursor, CURSOR_COLOR_FILL); break;
                         case KEY_C: if(isCtrlDown) toggleTool(&cursor, CURSOR_PIPETTE); break; // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
                         case KEY_S: if(isCtrlDown) canvas_saveAsImage(canvas, name_field); break;
+                        case KEY_R: if(isCtrlDown) if(canvas_redo(canvas)) forceImageResize = true; break;
+                        case KEY_U: if(canvas_undo(canvas)) forceImageResize = true; break;
+                        case KEY_Y: // fallthrough
+                        case KEY_Z: if(isCtrlDown) isShiftDown? (canvas_redo(canvas)? forceImageResize = true:false) : (canvas_undo(canvas)? forceImageResize=true:false); break;
                         case KEY_ESCAPE: cursor = CURSOR_DEFAULT; break;
                         case KEY_HOME: forceWindowResize = true; break; // this causes the canvas to be centered again.
                         case KEY_KP_ADD: {menu_font_size += 1; forceMenuResize = true;} break;
@@ -484,9 +490,20 @@ int main(int argc, char **argv){
         int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size;
         int item = 0;
 
+        item++;
+
+        // undo / redo buttons
+        Rectangle undo_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
+        Rectangle redo_box = {menu_padding + 0.5*menu_content_width, options_y + (item++)*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
+        if(GuiButton(undo_box, "#130#")){
+            if(canvas_undo(canvas)) forceImageResize = true;
+        }
+        if(GuiButton(redo_box, "#131#")){
+            if(canvas_redo(canvas)) forceImageResize = true;
+        }
+
         toolToggleButton("pipette", &cursor, CURSOR_PIPETTE, 27, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
-        item++;
         toolToggleButton("fill", &cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
 
         item++;
