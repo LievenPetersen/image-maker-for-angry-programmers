@@ -30,8 +30,6 @@
 
 #include "canvas.h"
 
-static void __canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color, bool record_undo);
-void __canvas_setToImage(canvas_t *canvas, Image image, bool record_undo);
 Texture2D loadImageAsTexture(Image *image);
 bool setTextureToImage(Texture2D *texture, Image *image);
 void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color fill);
@@ -39,16 +37,17 @@ void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color);
 
 #define MAX_UNDO_STEPS 100
 
-typedef struct pixel_diff_t {
+typedef struct pixel_t {
     Vector2 pos;
-    Color before;
-    Color after;
-} pixel_diff_t;
+    Color color;
+} pixel_t;
 
-typedef struct image_diff_t {
-    Image before;
-    Image after;
-} image_diff_t;
+typedef struct delta_t{
+    union {
+        pixel_t pixel;
+        Image image;
+    };
+}delta_t;
 
 typedef enum DIFF_TYPE {
     INVALID_DIFF = 0,
@@ -58,12 +57,9 @@ typedef enum DIFF_TYPE {
 
 typedef struct diff_t {
     DIFF_TYPE type;
-    bool is_user_input;
     size_t action_id;
-    union {
-        pixel_diff_t pixel_diff;
-        image_diff_t image_diff;
-    };
+    delta_t before;
+    delta_t after;
 } diff_t;
 
 typedef struct recorder_t {
@@ -78,7 +74,7 @@ typedef struct recorder_t {
 \
         switch(a.type){\
             case INVALID_DIFF: printf("<invalid> "); break;\
-            case PIXEL_DIFF: printf("<pix %zu (%d,%d)> ", a.action_id, (int)a.pixel_diff.pos.x, (int)a.pixel_diff.pos.y); break;\
+            case PIXEL_DIFF: printf("<pix %zu (%d,%d)> ", a.action_id, (int)a.before.pixel.pos.x, (int)a.before.pixel.pos.y); break;\
             case IMAGE_DIFF: printf("<img %zu> ", a.action_id); break;\
         }\
     }\
@@ -99,8 +95,8 @@ static void recorder_pop_tail(recorder_t *rec){
     diff_t diff = queue_poll(rec->undo_queue);
     switch(diff.type){
         case IMAGE_DIFF: {
-            UnloadImage(diff.image_diff.before);
-            UnloadImage(diff.image_diff.after);
+            UnloadImage(diff.before.image);
+            UnloadImage(diff.after.image);
         } break;
         // no free required:
         case INVALID_DIFF:
@@ -134,6 +130,10 @@ static diff_t recorder_forward(recorder_t *rec){
     }
 }
 
+static diff_t recorder_wind(recorder_t *rec, bool reverse){
+    return reverse? recorder_rewind(rec) : recorder_forward(rec);
+}
+
 static void recorder_free(recorder_t *rec){
     while(recorder_forward(rec).type != INVALID_DIFF); // push redos into undo queue
     while(queue_size(rec->undo_queue) > 0) recorder_pop_tail(rec);
@@ -157,7 +157,9 @@ canvas_t *canvas_new(Image content){
     queue_reserve_capacity(new->draw_queue, 3);
     queue_reserve_capacity(new->rec.undo_queue, MAX_UNDO_STEPS);
     queue_reserve_capacity(new->rec.redo_queue, 10);
-    __canvas_setToImage(new, content, false);
+    new->buffer = ImageCopy(content);
+    new->texture = loadImageAsTexture(&content);
+    new->size = (Vector2){content.width, content.height};
     return new;
 }
 
@@ -174,27 +176,43 @@ void canvas_free(canvas_t *canvas){
 
 // -- modifying function
 
-static void __canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color, bool record_undo){
-    Color old_color = GetImageColor(canvas->buffer, pixel.x, pixel.y);
-    diff_t diff = {.type=PIXEL_DIFF, record_undo, .pixel_diff={pixel, .before=old_color, .after=color}, .action_id=canvas->action_counter};
+static void __canvas_queue_diff(canvas_t *canvas, diff_t diff, bool reverse){
+    if (diff.type == INVALID_DIFF) return;
+
+    if (reverse){
+        delta_t temp = diff.before;
+        diff.before = diff.after;
+        diff.after = temp;
+    }
     queue_push(canvas->draw_queue, diff);
+
     // modify buffer
-    ImageDrawPixel(&canvas->buffer, pixel.x, pixel.y, color);
-}
-void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
-    __canvas_setPixel(canvas, pixel, color, true);
+    delta_t delta = diff.after;
+    switch (diff.type){
+        case PIXEL_DIFF:{
+            Color color = delta.pixel.color;
+            ImageDrawPixel(&canvas->buffer, delta.pixel.pos.x, delta.pixel.pos.y, color);
+        } break;
+        case IMAGE_DIFF:{
+            canvas->buffer = ImageCopy(delta.image);
+            canvas->size.x = canvas->buffer.width;
+            canvas->size.y = canvas->buffer.height;
+        } break;
+        case INVALID_DIFF: /*what the hell man (unreachable)*/ break;
+    }
 }
 
-void __canvas_setToImage(canvas_t *canvas, Image image, bool record_undo){
-    diff_t diff = {.type=IMAGE_DIFF, record_undo, .image_diff={.before=canvas->buffer, .after=ImageCopy(image)}, .action_id=0};
-    queue_push(canvas->draw_queue, diff);
-    // modify buffer
-    canvas->buffer = ImageCopy(image);
-    canvas->size.x = canvas->buffer.width;
-    canvas->size.y = canvas->buffer.height;
+void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
+    Color old_color = GetImageColor(canvas->buffer, pixel.x, pixel.y);
+    diff_t diff = {.type=PIXEL_DIFF, .before.pixel={pixel, old_color}, .after.pixel={pixel, color}, .action_id=canvas->action_counter};
+    recorder_record(&canvas->rec, diff);
+    __canvas_queue_diff(canvas, diff, false);
 }
+
 void canvas_setToImage(canvas_t *canvas, Image image){
-    __canvas_setToImage(canvas, image, true);
+    diff_t diff = {.type=IMAGE_DIFF, .before.image=canvas->buffer, .after.image=ImageCopy(image), .action_id=0}; // TODO: make images part of action_counter
+    recorder_record(&canvas->rec, diff);
+    __canvas_queue_diff(canvas, diff, false);
 }
 
 // start of a drawing action that groups the pixels of following canvas calls.
@@ -218,27 +236,20 @@ inline Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
 Texture2D canvas_nextFrame(canvas_t *canvas){
     while(queue_size(canvas->draw_queue) > 0){
         diff_t diff = queue_poll(canvas->draw_queue);
-        if (diff.type != INVALID_DIFF && diff.is_user_input){
-            recorder_record(&canvas->rec, diff);
-        }
         switch(diff.type){
             case IMAGE_DIFF: {
-                image_diff_t image = diff.image_diff;
-                if (IsImageReady(image.after)){
-                    setTextureToImage(&canvas->texture, &image.after);
-                    // this should already have happened, but just to make sure
-                    canvas->size.x = image.after.width;
-                    canvas->size.y = image.after.height;
-                }
-                if (!diff.is_user_input){ // if the images are not passed to the recorder they need to be freed.
-                    UnloadImage(image.before);
-                    UnloadImage(image.after);
+                Image image = diff.after.image;
+                if (IsImageReady(image)){
+                    setTextureToImage(&canvas->texture, &image);
+                    canvas->size.x = image.width;
+                    canvas->size.y = image.height;
                 }
             } break;
             case PIXEL_DIFF: {
-                pixel_diff_t pixel = diff.pixel_diff;
+                pixel_t pixel = diff.after.pixel;
                 Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
-                UpdateTextureRec(canvas->texture, rect, &pixel.after);
+                UpdateTextureRec(canvas->texture, rect, &pixel.color);
+                printf("process pixel %f.%f before: %8X after: %8X\n", pixel.pos.x, pixel.pos.y, *(unsigned int*)&diff.before.pixel.color, *(unsigned int*)&pixel.color);
             } break;
             case INVALID_DIFF: break;
         }
@@ -262,56 +273,38 @@ inline Vector2 canvas_getSize(canvas_t *canvas){
 // functions indirectly interacting with canvas struct
 
 // return true if the size of the canvas changed
-bool canvas_undo(canvas_t *canvas){
-    printf("undo\n");
+bool canvas_retrace(canvas_t *canvas, bool reverse){
     bool size_changed = false;
-    diff_t diff = recorder_rewind(&canvas->rec);
+    diff_t diff = recorder_wind(&canvas->rec, reverse);
     size_t action_id = diff.action_id;
     do {
         switch(diff.type){
-            case INVALID_DIFF: printf("reached oldest recorded change\n");break;
-            case PIXEL_DIFF: __canvas_setPixel(canvas, diff.pixel_diff.pos, diff.pixel_diff.before, false); break;
+            case INVALID_DIFF: printf("reached the end of recorded changes\n");break;
+            case PIXEL_DIFF: __canvas_queue_diff(canvas, diff, reverse); break;
             case IMAGE_DIFF: {
-                __canvas_setToImage(canvas, diff.image_diff.before, false);
-                size_changed |= diff.image_diff.before.width != diff.image_diff.after.width || diff.image_diff.before.height != diff.image_diff.after.height;
+                __canvas_queue_diff(canvas, diff, reverse);
+                size_changed |= diff.before.image.width != diff.after.image.width || diff.before.image.height != diff.after.image.height;
             } break;
         }
-        diff = recorder_rewind(&canvas->rec);
+        diff = recorder_wind(&canvas->rec, reverse);
         if (diff.type != INVALID_DIFF && (action_id == 0 || diff.action_id != action_id)){
-            recorder_forward(&canvas->rec);
+            recorder_wind(&canvas->rec, !reverse);
             break;
         }
     } while(action_id != 0 && action_id == diff.action_id && diff.type != INVALID_DIFF);
     recorder_print_state(&canvas->rec);
     return size_changed;
+}
+
+bool canvas_undo(canvas_t *canvas){
+    printf("undo\n");
+    return canvas_retrace(canvas, true);
 }
 
 bool canvas_redo(canvas_t *canvas){
     printf("redo\n");
-    // this undo and redo share logic
-    bool size_changed = false;
-    diff_t diff = recorder_forward(&canvas->rec);
-    size_t action_id = diff.action_id;
-    do {
-        switch(diff.type){
-            case INVALID_DIFF: printf("already at newest change\n"); break;
-            case PIXEL_DIFF: __canvas_setPixel(canvas, diff.pixel_diff.pos, diff.pixel_diff.after, false); break;
-            case IMAGE_DIFF: {
-                __canvas_setToImage(canvas, diff.image_diff.after, false);
-                size_changed |= diff.image_diff.before.width != diff.image_diff.after.width || diff.image_diff.before.height != diff.image_diff.after.height;
-            } break;
-        }
-        diff = recorder_forward(&canvas->rec);
-        if (diff.type != INVALID_DIFF && (action_id == 0 || diff.action_id != action_id)){
-            recorder_rewind(&canvas->rec);
-            break;
-        }
-    } while(action_id != 0 && action_id == diff.action_id && diff.type != INVALID_DIFF);
-    recorder_print_state(&canvas->rec);
-    return size_changed;
+    return canvas_retrace(canvas, false);
 }
-
-
 
 void canvas_blendPixel(canvas_t *canvas, Vector2 pixel, Color color){
     Color new_color = color;
