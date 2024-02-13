@@ -332,7 +332,7 @@ int main(int argc, char **argv){
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage){
                 isMouseDrawing = cursor == CURSOR_DEFAULT;
                 prev_pixel.x = -1; // set to out of bounds, so that any valid pixel is different from it.
-                canvas_startPixelStroke(canvas);
+                canvas_nextPixelStroke(canvas);
             }
 
             // detect canvas mouse down

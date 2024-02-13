@@ -198,7 +198,7 @@ void canvas_setToImage(canvas_t *canvas, Image image){
 }
 
 // start of a drawing action that groups the pixels of following canvas calls.
-void canvas_startPixelStroke(canvas_t *canvas){
+void canvas_nextPixelStroke(canvas_t *canvas){
     canvas->action_counter++;
     if (canvas->action_counter == 0) canvas->action_counter += 1;
 }
