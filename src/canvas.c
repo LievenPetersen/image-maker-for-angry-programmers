@@ -26,7 +26,7 @@
 #include "external/raylib/src/raylib.h"
 
 #include "external/stack.h"
-#include "external/queue.h"
+#include "external/deque.h"
 
 #include "canvas.h"
 
@@ -62,37 +62,15 @@ typedef struct diff_t {
     delta_t after;
 } diff_t;
 
+typedef DEQ(diff_t) diff_deq_t;
+
 typedef struct recorder_t {
-    diff_t *undo_queue;
-    diff_t *redo_queue;
+    diff_deq_t undo_queue;
+    diff_deq_t redo_queue;
 } recorder_t;
 
-#define __recorder_print_diff_queue(queue){\
-    for (size_t i = 0; i < queue_size(queue); i++){\
-        diff_t a = queue_poll(queue);\
-        queue_push(queue, a);\
-\
-        switch(a.type){\
-            case INVALID_DIFF: printf("<invalid> "); break;\
-            case PIXEL_DIFF: printf("<pix %zu (%d,%d)> ", a.action_id, (int)a.before.pixel.pos.x, (int)a.before.pixel.pos.y); break;\
-            case IMAGE_DIFF: printf("<img %zu> ", a.action_id); break;\
-        }\
-    }\
-}
-
-static void recorder_print_state(recorder_t *rec){
-    printf("--recorder state--\n");
-    printf("  undo: <<");
-    __recorder_print_diff_queue(rec->undo_queue);
-    printf(" <<\n");
-
-    printf("  redo: <<");
-    __recorder_print_diff_queue(rec->redo_queue);
-    printf("<<\n");
-}
-
-static void recorder_pop_tail(recorder_t *rec){
-    diff_t diff = queue_poll(rec->undo_queue);
+static void recorder_pop_tail(diff_deq_t *deque){
+    diff_t diff = deq_poll(*deque);
     switch(diff.type){
         case IMAGE_DIFF: {
             UnloadImage(diff.before.image);
@@ -105,25 +83,15 @@ static void recorder_pop_tail(recorder_t *rec){
 }
 
 static void recorder_record(recorder_t *rec, diff_t diff){
-    if (queue_size(rec->undo_queue) >= MAX_UNDO_STEPS) recorder_pop_tail(rec);
-    queue_push(rec->undo_queue, diff);
-    queue_clear(rec->redo_queue);
+    if (deq_size(rec->undo_queue) >= MAX_UNDO_STEPS) recorder_pop_tail(&rec->undo_queue);
+    deq_push(rec->undo_queue, diff);
+    while(deq_size(rec->redo_queue) > 0) recorder_pop_tail(&rec->redo_queue);
 }
 
-static diff_t recorder_rewind(recorder_t *rec){
-    if (queue_size(rec->undo_queue) > 0){
-        diff_t diff = queue_pop(rec->undo_queue);
-        queue_push(rec->redo_queue, diff);
-        return diff;
-    } else {
-        return (diff_t){.type=INVALID_DIFF};
-    }
-}
-static diff_t recorder_forward(recorder_t *rec){
-    // this code is duplicated with recorder_rewind, but due to queue implementation, passing queue references doesn't work
-    if (queue_size(rec->redo_queue) > 0){
-        diff_t diff = queue_pop(rec->redo_queue);
-        queue_push(rec->undo_queue, diff);
+static diff_t __recorder_wind(diff_deq_t *from, diff_deq_t *to){
+    if (deq_size(*from) > 0){
+        diff_t diff = deq_pop(*from);
+        deq_push(*to, diff);
         return diff;
     } else {
         return (diff_t){.type=INVALID_DIFF};
@@ -131,14 +99,15 @@ static diff_t recorder_forward(recorder_t *rec){
 }
 
 static diff_t recorder_wind(recorder_t *rec, bool reverse){
-    return reverse? recorder_rewind(rec) : recorder_forward(rec);
+    return reverse? __recorder_wind(&rec->undo_queue, &rec->redo_queue)
+        : __recorder_wind(&rec->redo_queue, &rec->undo_queue);
 }
 
 static void recorder_free(recorder_t *rec){
-    while(recorder_forward(rec).type != INVALID_DIFF); // push redos into undo queue
-    while(queue_size(rec->undo_queue) > 0) recorder_pop_tail(rec);
-    free(rec->undo_queue);
-    free(rec->redo_queue);
+    while(recorder_wind(rec, false).type != INVALID_DIFF); // push redos into undo queue
+    while(deq_size(rec->undo_queue) > 0) recorder_pop_tail(&rec->undo_queue);
+    deq_free(rec->undo_queue);
+    deq_free(rec->redo_queue);
 }
 
 struct canvas_t{
@@ -146,7 +115,7 @@ struct canvas_t{
     Vector2 size;
     Texture2D texture;
     recorder_t rec;
-    diff_t *draw_queue;
+    diff_deq_t draw_queue;
     size_t action_counter;
 };
 
@@ -154,9 +123,6 @@ struct canvas_t{
 
 canvas_t *canvas_new(Image content){
     canvas_t *new = calloc(1, sizeof(*new));
-    queue_reserve_capacity(new->draw_queue, 3);
-    queue_reserve_capacity(new->rec.undo_queue, MAX_UNDO_STEPS);
-    queue_reserve_capacity(new->rec.redo_queue, 10);
     new->buffer = ImageCopy(content);
     new->texture = loadImageAsTexture(&content);
     new->size = (Vector2){content.width, content.height};
@@ -166,7 +132,7 @@ canvas_t *canvas_new(Image content){
 void canvas_free(canvas_t *canvas){
     UnloadTexture(canvas->texture);
     UnloadImage(canvas->buffer);
-    queue_free(canvas->draw_queue);
+    deq_free(canvas->draw_queue);
     recorder_free(&canvas->rec);
     free(canvas);
 }
@@ -184,7 +150,7 @@ static void __canvas_queue_diff(canvas_t *canvas, diff_t diff, bool reverse){
         diff.before = diff.after;
         diff.after = temp;
     }
-    queue_push(canvas->draw_queue, diff);
+    deq_push(canvas->draw_queue, diff);
 
     // modify buffer
     delta_t delta = diff.after;
@@ -234,8 +200,8 @@ inline Color canvas_getPixel(canvas_t *canvas, Vector2 pixel){
 
 // this function has the side effect of evaluating and applying any queued modifications to the texture.
 Texture2D canvas_nextFrame(canvas_t *canvas){
-    while(queue_size(canvas->draw_queue) > 0){
-        diff_t diff = queue_poll(canvas->draw_queue);
+    while(deq_size(canvas->draw_queue) > 0){
+        diff_t diff = deq_poll(canvas->draw_queue);
         switch(diff.type){
             case IMAGE_DIFF: {
                 Image image = diff.after.image;
@@ -249,7 +215,6 @@ Texture2D canvas_nextFrame(canvas_t *canvas){
                 pixel_t pixel = diff.after.pixel;
                 Rectangle rect = {pixel.pos.x, pixel.pos.y, 1, 1};
                 UpdateTextureRec(canvas->texture, rect, &pixel.color);
-                printf("process pixel %f.%f before: %8X after: %8X\n", pixel.pos.x, pixel.pos.y, *(unsigned int*)&diff.before.pixel.color, *(unsigned int*)&pixel.color);
             } break;
             case INVALID_DIFF: break;
         }
@@ -292,7 +257,6 @@ bool canvas_retrace(canvas_t *canvas, bool reverse){
             break;
         }
     } while(action_id != 0 && action_id == diff.action_id && diff.type != INVALID_DIFF);
-    recorder_print_state(&canvas->rec);
     return size_changed;
 }
 
