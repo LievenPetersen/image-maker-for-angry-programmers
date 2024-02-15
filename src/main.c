@@ -490,8 +490,6 @@ int main(int argc, char **argv){
         int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size;
         int item = 0;
 
-        item++;
-
         // undo / redo buttons
         Rectangle undo_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
         Rectangle redo_box = {menu_padding + 0.5*menu_content_width, options_y + (item++)*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
