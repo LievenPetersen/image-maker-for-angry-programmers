@@ -40,8 +40,7 @@
 // DIM_STRLEN-1 digits can be entered when resizing the canvas
 #define DIM_STRLEN 4
 
-#define MAX_NAME_FIELD_SIZE 200
-
+#define MAX_FILENAME_SIZE 200
 
 
 typedef struct shared_state_t{
@@ -56,16 +55,17 @@ typedef struct shared_state_t{
 
 typedef struct menu_state_t{
     // TODO: make field + isEditing abstraction
-    char *hex_field, *x_field, *y_field, *name_field, *name_field_old;
-    bool isEditingHexField, isEditingNameField, isEditingXField, isEditingYField;
+    char *hex_field, *x_field, *y_field, *filename, *filename_old;
+    bool isEditingHexField, isEditingFileName, isEditingXField, isEditingYField;
+    int font_size;
     #ifndef DISABLE_CUSTOM_FONT
     Font *fonts;
     Font font;
     #endif
 }menu_state_t;
 
-void initMenu(menu_state_t *ms);
-void drawMenu(shared_state_t *s, menu_state_t *mf, int menu_width, int menu_font_size);
+menu_state_t initMenu(char *image_name);
+void drawMenu(shared_state_t *s, menu_state_t *mf, Rectangle menu_rect);
 void unloadMenu(menu_state_t *ms);
 
 // utils

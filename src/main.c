@@ -57,14 +57,14 @@ int main(int argc, char **argv){
 
     // -- initialize application --
 
+    // generate standard 8x8 image
     Image starter_image = GenImageColor(8, 8, STD_COLOR);
     canvas_t *prep_canvas = canvas_new(starter_image);
     UnloadImage(starter_image);
 
-    bool hasImage = false;
+    bool has_loaded_image = false;
 
-    char name_field[MAX_NAME_FIELD_SIZE];
-    char name_field_old[MAX_NAME_FIELD_SIZE];
+    char filename[MAX_FILENAME_SIZE];
 
     // load image from provided path
     if (argc == 2){
@@ -75,51 +75,27 @@ int main(int argc, char **argv){
             return 1;
         }
         canvas_setToImage(prep_canvas, img);
-        if (strnlen(argv[1], MAX_NAME_FIELD_SIZE) == MAX_NAME_FIELD_SIZE){
-            name_field[MAX_NAME_FIELD_SIZE-1] = 0; // brutal approach to make string fit.
+        if (strnlen(argv[1], MAX_FILENAME_SIZE) == MAX_FILENAME_SIZE){
+            filename[MAX_FILENAME_SIZE-1] = 0; // brutal approach to make string fit.
             // TODO: more graceful solution, that doesn't rip out the postfix.
         }
-        sprintf(name_field, "%s", argv[1]);
-        setWindowTitleToPath(name_field);
+        sprintf(filename, "%s", argv[1]);
+        setWindowTitleToPath(filename);
 
-        hasImage = true;
+        has_loaded_image = true;
         UnloadImage(img);
     }
 
-    // generate standard 8x8 image
-    if (!hasImage){
-        sprintf(name_field, "out.png");
-
-        hasImage = true;
+    if (!has_loaded_image){
+        sprintf(filename, "out.png");
+        has_loaded_image = true;
     }
-    sprintf(name_field_old, "%s", name_field);
 
-    // strings for image resizing textBoxes
-    char x_field[DIM_STRLEN];
-    char y_field[DIM_STRLEN];
-
-    char hex_field[11];
-
-    // the isEditing fields get initialized to false
-    menu_state_t fields = {0};
-    fields.x_field = x_field;
-    fields.y_field = y_field;
-    fields.hex_field = hex_field;
-    fields.name_field = name_field;
-    fields.name_field_old = name_field_old;
-
-    menu_state_t *ms = &fields;
-
-    // menu parameters
-    int menu_font_size = DEFAULT_FONT_SIZE;
-
-    // these are set on forceMenuResize
-    int menu_width = 0;
-
-    initMenu(ms);
+    menu_state_t menu_state = initMenu(filename);
+    menu_state_t *ms = &menu_state;
 
     shared_state_t state = {
-        .active_color = {{0}}, // maybe disable Wmissing-braces to avoid extra braces?
+        .active_color = {{0}}, // maybe disable Wmissing-braces to get rid of extra braces?
         .canvas = prep_canvas,
         .cursor = CURSOR_DEFAULT,
         .showGrid = true,
@@ -129,8 +105,6 @@ int main(int argc, char **argv){
     };
 
     shared_state_t *s = &state;
-
-    //bool showGrid = true;
 
     bool isMouseDrawing = false;
     Vector2 prev_pixel = {0};
@@ -156,28 +130,24 @@ int main(int argc, char **argv){
         if (s->forceMenuResize){
             s->forceMenuResize = false;
             s->forceImageResize = true;
-            // TODO: move parameters to struct?
 
-            menu_width = 20*menu_font_size/3; // allow font size to force a minimum width
+            int menu_width = 20*ms->font_size/3; // allow font size to force a minimum width
             menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
         }
         if (s->forceImageResize){
             s->forceImageResize = false;
-            drawingBounds = (Rectangle){menu_width, 0, GetScreenWidth()-menu_width, GetScreenHeight()};
-            if (hasImage){
-                // TODO: fit image to rect
-                // TODO support images bigger than drawingBounds
-                // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
-                Vector2 canvas_size = canvas_getSize(s->canvas);
-                _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas_size.x, drawingBounds.height / canvas_size.y)));
-                scale = (int)_floating_scale;
-                image_position = (Vector2){drawingBounds.width - canvas_size.x*scale, drawingBounds.height - canvas_size.y*scale};
-                image_position = Vector2Scale(image_position, 0.5);
-                image_position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, image_position);
-            }
+            drawingBounds = (Rectangle){menu_rect.width, 0, GetScreenWidth()-menu_rect.width, GetScreenHeight()};
+            // TODO support images bigger than drawingBounds
+            // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
+            Vector2 canvas_size = canvas_getSize(s->canvas);
+            _floating_scale = MAX(1.0f, floor(MIN(drawingBounds.width / canvas_size.x, drawingBounds.height / canvas_size.y)));
+            scale = (int)_floating_scale;
+            image_position = (Vector2){drawingBounds.width - canvas_size.x*scale, drawingBounds.height - canvas_size.y*scale};
+            image_position = Vector2Scale(image_position, 0.5);
+            image_position = Vector2Add((Vector2){drawingBounds.x, drawingBounds.y}, image_position);
         }
         // handle mouse and keyboard input
-        if (hasImage && !ms->isEditingNameField){ // name field can overlap with the canvas
+        if (!ms->isEditingFileName){ // name field can overlap with the canvas
 
             Rectangle image_bounds = {image_position.x, image_position.y, canvas_getSize(s->canvas).x*scale, canvas_getSize(s->canvas).y*scale};
             bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
@@ -224,15 +194,15 @@ int main(int argc, char **argv){
                         case KEY_P: toggleTool(&s->cursor, CURSOR_PIPETTE); break;
                         case KEY_F: toggleTool(&s->cursor, CURSOR_COLOR_FILL); break;
                         case KEY_C: if(isCtrlDown) toggleTool(&s->cursor, CURSOR_PIPETTE); break; // still toggle, to conveniently escape the mode without reaching for KEY_ESCAPE.
-                        case KEY_S: if(isCtrlDown) canvas_saveAsImage(s->canvas, ms->name_field); break;
+                        case KEY_S: if(isCtrlDown) canvas_saveAsImage(s->canvas, ms->filename); break;
                         case KEY_R: if(isCtrlDown) if(canvas_redo(s->canvas)) s->forceImageResize = true; break;
                         case KEY_U: if(canvas_undo(s->canvas)) s->forceImageResize = true; break;
                         case KEY_Y: // fallthrough
                         case KEY_Z: if(isCtrlDown) isShiftDown? (canvas_redo(s->canvas)? s->forceImageResize = true:false) : (canvas_undo(s->canvas)? s->forceImageResize=true:false); break;
                         case KEY_ESCAPE: s->cursor = CURSOR_DEFAULT; break;
                         case KEY_HOME: s->forceWindowResize = true; break; // this causes the canvas to be centered again.
-                        case KEY_KP_ADD: {menu_font_size += 1; s->forceMenuResize = true;} break;
-                        case KEY_KP_SUBTRACT: {menu_font_size -= 1; s->forceMenuResize = true;} break;
+                        case KEY_KP_ADD: {ms->font_size += 1; s->forceMenuResize = true;} break;
+                        case KEY_KP_SUBTRACT: {ms->font_size -= 1; s->forceMenuResize = true;} break;
                     }
                 }
 
@@ -292,7 +262,7 @@ int main(int argc, char **argv){
             DrawRectangleLines(floored_image_position.x-1, floored_image_position.y-1, canvas_getSize(s->canvas).x*scale+2, canvas_getSize(s->canvas).y*scale+2, GRID_COLOR);
         }
 
-        drawMenu(s, ms, menu_width, menu_font_size);
+        drawMenu(s, ms, menu_rect);
 
         EndDrawing();
     }

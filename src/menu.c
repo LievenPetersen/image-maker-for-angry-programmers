@@ -91,7 +91,7 @@ static void setMenuStyle() {
     GuiSetStyle(DEFAULT, BACKGROUND_COLOR, 0x181818FF);
 }
 
-static Font loadMenuFont(menu_state_t *ms){
+static void loadMenuFont(menu_state_t *ms){
     Font font = {0};
     // load custom font
 #ifndef DISABLE_CUSTOM_FONT
@@ -108,40 +108,56 @@ static Font loadMenuFont(menu_state_t *ms){
     GuiSetStyle(DEFAULT, TEXT_SPACING, 0);
     font = fonts[1];
     ms->fonts = fonts;
-    ms->font = font;
 #else
     font = GetFontDefault();
 #endif // DISABLE_CUSTOM_FONT
-    return font;
+    ms->font = font;
+    ms->font_size = DEFAULT_FONT_SIZE;
 }
 
-void initMenu(menu_state_t *ms){
+menu_state_t initMenu(char *image_name){
+    menu_state_t menu_state = {
+        .x_field            = RL_MALLOC(DIM_STRLEN),
+        .y_field            = RL_MALLOC(DIM_STRLEN),
+        .hex_field          = RL_MALLOC(11),
+        .filename          = RL_MALLOC(MAX_FILENAME_SIZE),
+        .filename_old      = RL_MALLOC(MAX_FILENAME_SIZE),
+        .isEditingFileName  = false,
+        .isEditingHexField  = false,
+        .isEditingXField    = false,
+        .isEditingYField    = false
+    };
+    sprintf(menu_state.filename,     "%s", image_name);
+    sprintf(menu_state.filename_old, "%s", image_name);
+
     setMenuStyle();
-    loadMenuFont(ms);
+    loadMenuFont(&menu_state);
+
+    return menu_state;
 }
 
-void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font_size){
+void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
 
     // TODO: this only needs to happen if the font size was changed
     #ifndef DISABLE_CUSTOM_FONT
         // chose most fitting font resolution, avoid upscaling.
-        if (2*menu_font_size <= DEFAULT_FONT_SIZE) { ms->font = ms->fonts[0]; }
-        else if (menu_font_size > DEFAULT_FONT_SIZE) { ms->font = ms->fonts[2]; }
+        if (2*ms->font_size <= DEFAULT_FONT_SIZE) { ms->font = ms->fonts[0]; }
+        else if (ms->font_size > DEFAULT_FONT_SIZE) { ms->font = ms->fonts[2]; }
         else { ms->font = ms->fonts[1]; }
     #endif //DISABLE_CUSTOM_FONT
 
     GuiSetFont(ms->font);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, menu_font_size);
+    GuiSetStyle(DEFAULT, TEXT_SIZE, ms->font_size);
 
     // utilities for menu layout
-    int menu_padding = menu_width / 10;
-    int menu_content_width = menu_width - 2*menu_padding;
-    int huebar_width = menu_width*2/25;
+    int menu_padding = menu_rect.width / 10;
+    int menu_content_width = menu_rect.width - 2*menu_padding;
+    int huebar_width = menu_rect.width*2/25;
     int huebar_padding = huebar_width/2;
 
     // draw menu
-    DrawRectangle(0, 0, menu_width, GetScreenHeight(), ColorAlpha(FAV_COLOR, 0.2));
-    DrawLine(menu_width, 0, menu_width, GetScreenHeight(), GRAY);
+    DrawRectangleRec(menu_rect, ColorAlpha(FAV_COLOR, 0.2));
+    DrawLine(menu_rect.width, 0, menu_rect.width, GetScreenHeight(), GRAY);
 
     // color picker
     int color_picker_y = menu_padding;
@@ -165,7 +181,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
         sprintf(ms->hex_field, "%02X%02X%02X%02X", color.r, color.g, color.b, color.a);
     }
 
-    Rectangle hex_box = {menu_padding, color_picker_size + color_picker_y + huebar_padding, menu_content_width, menu_font_size};
+    Rectangle hex_box = {menu_padding, color_picker_size + color_picker_y + huebar_padding, menu_content_width, ms->font_size};
     if(GuiTextBox(hex_box, ms->hex_field, 9, ms->isEditingHexField)){
         ms->isEditingHexField = !ms->isEditingHexField;
         if (!ms->isEditingHexField){
@@ -189,12 +205,12 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
         }
     }
 
-    int options_y = color_picker_size + color_picker_y + 2*huebar_padding + menu_font_size;
+    int options_y = color_picker_size + color_picker_y + 2*huebar_padding + ms->font_size;
     int item = 0;
 
     // undo / redo buttons
-    Rectangle undo_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
-    Rectangle redo_box = {menu_padding + 0.5*menu_content_width, options_y + (item++)*(huebar_padding+menu_font_size), 0.5*menu_content_width, menu_font_size};
+    Rectangle undo_box = {menu_padding, options_y + item*(huebar_padding+ms->font_size), 0.5*menu_content_width, ms->font_size};
+    Rectangle redo_box = {menu_padding + 0.5*menu_content_width, options_y + (item++)*(huebar_padding+ms->font_size), 0.5*menu_content_width, ms->font_size};
     if(GuiButton(undo_box, "#130#")){
         if(canvas_undo(s->canvas)) s->forceImageResize = true;
     }
@@ -202,17 +218,17 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
         if(canvas_redo(s->canvas)) s->forceImageResize = true;
     }
 
-    toolToggleButton("pipette", &s->cursor, CURSOR_PIPETTE, 27, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
+    toolToggleButton("pipette", &s->cursor, CURSOR_PIPETTE, 27, options_y + (item++)*(huebar_padding+ms->font_size), menu_padding, menu_content_width, ms->font_size);
 
-    toolToggleButton("fill", &s->cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+menu_font_size), menu_padding, menu_content_width, menu_font_size);
+    toolToggleButton("fill", &s->cursor, CURSOR_COLOR_FILL, 29, options_y + (item++)*(huebar_padding+ms->font_size), menu_padding, menu_content_width, ms->font_size);
 
     item++;
     // grid checkbox
-    GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+menu_font_size), menu_font_size, menu_font_size}, "grid", &s->showGrid);
+    GuiCheckBox((Rectangle){menu_padding, options_y + (item++)*(huebar_padding+ms->font_size), ms->font_size, ms->font_size}, "grid", &s->showGrid);
 
     // x resize textbox
     if (!ms->isEditingXField) sprintf(ms->x_field, "%d", (int)canvas_getSize(s->canvas).x); // TODO: maybe only reprint this if canvas size changes.
-    Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+    Rectangle x_box = {menu_padding, options_y + item*(huebar_padding+ms->font_size), menu_content_width - ms->font_size, ms->font_size};
     long res = dimensionTextBox(x_box, ms->x_field, DIM_STRLEN, canvas_getSize(s->canvas).x, &ms->isEditingXField);
     if (res > 0){
         Vector2 new_size = canvas_getSize(s->canvas);
@@ -220,11 +236,11 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
         s->forceWindowResize = true;
         canvas_resize(s->canvas, new_size, STD_COLOR);
     }
-    DrawTextEx(ms->font, "W", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
+    DrawTextEx(ms->font, "W", (Vector2){menu_padding + menu_content_width + huebar_padding - ms->font_size, options_y + (item++)*(huebar_padding+ms->font_size)}, ms->font_size, 1, WHITE);
 
     // y resize textbox
     if (!ms->isEditingYField) sprintf(ms->y_field, "%d", (int)canvas_getSize(s->canvas).y); // TODO: maybe only reprint this if canvas size changes.
-    Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), menu_content_width - menu_font_size, menu_font_size};
+    Rectangle y_box = {menu_padding, options_y + item*(huebar_padding+ms->font_size), menu_content_width - ms->font_size, ms->font_size};
     res = dimensionTextBox(y_box, ms->y_field, DIM_STRLEN, canvas_getSize(s->canvas).y, &ms->isEditingYField);
     if (res > 0){
         Vector2 new_size = canvas_getSize(s->canvas);
@@ -232,11 +248,11 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
         s->forceWindowResize = true;
         canvas_resize(s->canvas, new_size, STD_COLOR);
     }
-    DrawTextEx(ms->font, "H", (Vector2){menu_padding + menu_content_width + huebar_padding - menu_font_size, options_y + (item++)*(huebar_padding+menu_font_size)}, menu_font_size, 1, WHITE);
+    DrawTextEx(ms->font, "H", (Vector2){menu_padding + menu_content_width + huebar_padding - ms->font_size, options_y + (item++)*(huebar_padding+ms->font_size)}, ms->font_size, 1, WHITE);
 
     // change resolution buttons
-    Rectangle first_box = {menu_padding, options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
-    Rectangle second_box = {menu_padding + 0.5*(menu_content_width - menu_font_size), options_y + item*(huebar_padding+menu_font_size), 0.5*(menu_content_width - menu_font_size), menu_font_size};
+    Rectangle first_box = {menu_padding, options_y + item*(huebar_padding+ms->font_size), 0.5*(menu_content_width - ms->font_size), ms->font_size};
+    Rectangle second_box = {menu_padding + 0.5*(menu_content_width - ms->font_size), options_y + item*(huebar_padding+ms->font_size), 0.5*(menu_content_width - ms->font_size), ms->font_size};
     if(GuiButton(first_box, "#96#*2")){
         canvas_changeResolution(s->canvas, 2);
         s->forceImageResize = true;
@@ -249,41 +265,41 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, int menu_width, int menu_font
     item++;
 
     // lower menu
-    int min_y = options_y + item*(huebar_padding+menu_font_size);
-    int save_button_height = menu_font_size/6*7; // slightly higher, so that parentheses fit in the box.
+    int min_y = options_y + item*(huebar_padding+ms->font_size);
+    int save_button_height = ms->font_size/6*7; // slightly higher, so that parentheses fit in the box.
 
     // file name
-    int desired_text_box_y = GetScreenHeight() - menu_padding - huebar_padding - menu_font_size - save_button_height;
+    int desired_text_box_y = GetScreenHeight() - menu_padding - huebar_padding - ms->font_size - save_button_height;
     int name_width = menu_content_width;
-    if (ms->isEditingNameField){
-        int needed_width = MeasureText(ms->name_field, menu_font_size) + menu_font_size;
+    if (ms->isEditingFileName){
+        int needed_width = MeasureText(ms->filename, ms->font_size) + ms->font_size;
         name_width = MAX(name_width, needed_width);
         name_width = MIN(name_width, GetScreenWidth() - 2*menu_padding);
 
-        DrawTextEx(ms->font, ".png .bmp .qoi .raw", (Vector2){menu_padding, MAX(min_y, desired_text_box_y) - 0.6*menu_font_size}, 0.6*menu_font_size, 1, STD_COLOR);
+        DrawTextEx(ms->font, ".png .bmp .qoi .raw", (Vector2){menu_padding, MAX(min_y, desired_text_box_y) - 0.6*ms->font_size}, 0.6*ms->font_size, 1, STD_COLOR);
     }
-    if(GuiTextBox((Rectangle){menu_padding, MAX(min_y, desired_text_box_y), name_width, menu_font_size}, ms->name_field, MAX_NAME_FIELD_SIZE, ms->isEditingNameField)){
-        ms->isEditingNameField = !ms->isEditingNameField;
+    if(GuiTextBox((Rectangle){menu_padding, MAX(min_y, desired_text_box_y), name_width, ms->font_size}, ms->filename, MAX_FILENAME_SIZE, ms->isEditingFileName)){
+        ms->isEditingFileName = !ms->isEditingFileName;
         // validate
-        if (!ms->isEditingNameField){
-            if (isSupportedImageFormat(ms->name_field)
-                && DirectoryExists(GetDirectoryPath(ms->name_field))){
+        if (!ms->isEditingFileName){
+            if (isSupportedImageFormat(ms->filename)
+                && DirectoryExists(GetDirectoryPath(ms->filename))){
                 // accept new name
-                    memcpy(ms->name_field_old, ms->name_field, strlen(ms->name_field)+1);
-                    setWindowTitleToPath(ms->name_field);
+                    memcpy(ms->filename_old, ms->filename, strlen(ms->filename)+1);
+                    setWindowTitleToPath(ms->filename);
             } else {
                 // reject name: reset to old name
-                memcpy(ms->name_field, ms->name_field_old, strlen(ms->name_field_old)+1);
+                memcpy(ms->filename, ms->filename_old, strlen(ms->filename_old)+1);
             }
         }
     }
 
     // save button
     int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
-    Rectangle save_rect = {menu_padding, MAX(min_y + menu_font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
-    if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_width, save_rect.y + (save_rect.height - menu_font_size)/2}, menu_font_size, 1, WHITE);
+    Rectangle save_rect = {menu_padding, MAX(min_y + ms->font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
+    if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);
     if(GuiButton(save_rect, "save")){
-        canvas_saveAsImage(s->canvas, ms->name_field);
+        canvas_saveAsImage(s->canvas, ms->filename);
     }
 }
 
