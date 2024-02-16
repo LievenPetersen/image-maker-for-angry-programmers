@@ -1,5 +1,5 @@
-#ifndef __font_h
-#define __font_h
+#ifndef __FONT_H
+#define __FONT_H
 
 // A .ttf file, compressed with the DEFLATE algorithm.
 const unsigned long COMPRESSED_TTF_FONT_SIZE = 19324;
@@ -610,4 +610,4 @@ const unsigned int COMPRESSED_TTF_FONT[] = {
     0x57a0420c, 0x76e5173e, 0xa95c94ee, 0xef92ef11, 0xbb8bf961, 0x26fd1ef8, 0x0bffc884, 
 };
 
-#endif //__font_h
+#endif //__FONT_H

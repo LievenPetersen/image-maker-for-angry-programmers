@@ -20,6 +20,9 @@
  *  3. This notice may not be removed or altered from any source distribution.
  */
 
+#ifndef __CANVAS_H
+#define __CANVAS_H
+
 #include "external/raylib/src/raylib.h"
 
 // all fields are readonly
@@ -53,3 +56,4 @@ void canvas_colorFlood(canvas_t *canvas, Vector2 source, Color flood);
 
 bool canvas_saveAsImage(canvas_t *canvas, const char *path);
 
+#endif // __CANVAS_H
