@@ -46,7 +46,7 @@ int main(int argc, char **argv){
     // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(1000, 800, "Image maker for angry programmers");
-    SetExitKey(KEY_NULL); // disable exit on KEY_ESCAPE;
+    SetExitKey(KEY_NULL); // disable exit on KEY_ESCAPE to avoid accidental window closing.
     SetTargetFPS(60);
 
     BeginDrawing();
@@ -57,39 +57,37 @@ int main(int argc, char **argv){
 
     // -- initialize application --
 
-    // generate standard 8x8 image
-    Image starter_image = GenImageColor(8, 8, STD_COLOR);
-    canvas_t *prep_canvas = canvas_new(starter_image);
-    UnloadImage(starter_image);
-
+    Image start_image = {0};
     bool has_loaded_image = false;
-
     char filename[MAX_FILENAME_SIZE];
 
     // load image from provided path
     if (argc == 2){
-        Image img = LoadImage(argv[1]);
-        if (!IsImageReady(img)){
+        start_image = LoadImage(argv[1]);
+        if (!IsImageReady(start_image)){
             printf("Error: failed to load image from '%s'\n", argv[1]);
-            UnloadImage(img);
+            UnloadImage(start_image);
             return 1;
         }
-        canvas_setToImage(prep_canvas, img);
+        has_loaded_image = true;
+
         if (strnlen(argv[1], MAX_FILENAME_SIZE) == MAX_FILENAME_SIZE){
             filename[MAX_FILENAME_SIZE-1] = 0; // brutal approach to make string fit.
             // TODO: more graceful solution, that doesn't rip out the postfix.
         }
         sprintf(filename, "%s", argv[1]);
+        // only set window title, if an image has been opened
         setWindowTitleToPath(filename);
-
-        has_loaded_image = true;
-        UnloadImage(img);
     }
 
+    // generate standard 8x8 image
     if (!has_loaded_image){
+        start_image = GenImageColor(8, 8, STD_COLOR);
         sprintf(filename, "out.png");
         has_loaded_image = true;
     }
+    canvas_t *prep_canvas = canvas_new(start_image);
+    UnloadImage(start_image);
 
     menu_state_t menu_state = initMenu(filename);
     menu_state_t *ms = &menu_state;
@@ -103,7 +101,6 @@ int main(int argc, char **argv){
         .forceMenuResize = true,
         .forceWindowResize = true,
     };
-
     shared_state_t *s = &state;
 
     bool isMouseDrawing = false;
