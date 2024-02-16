@@ -304,6 +304,11 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
 }
 
 void unloadMenu(menu_state_t *ms){
+    RL_FREE(ms->x_field);
+    RL_FREE(ms->y_field);
+    RL_FREE(ms->hex_field);
+    RL_FREE(ms->filename);
+    RL_FREE(ms->filename_old);
     #ifndef DISABLE_CUSTOM_FONT
         for (int i = 0; i < FONT_LEVELS; i++){
             UnloadFont(ms->fonts[i]);

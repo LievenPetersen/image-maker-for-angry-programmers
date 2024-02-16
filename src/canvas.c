@@ -165,7 +165,7 @@ static void __canvas_queue_diff(canvas_t *canvas, diff_t diff, DIRECTION dir){
             ImageDrawPixel(&canvas->buffer, delta.pixel.pos.x, delta.pixel.pos.y, color);
         } break;
         case IMAGE_DIFF:{
-            canvas->buffer = ImageCopy(delta.image);
+            canvas->buffer = ImageCopy(delta.image); // TODO: properly free the initial buffer on exit / when it is no longer in the undo queue.
             canvas->size.x = canvas->buffer.width;
             canvas->size.y = canvas->buffer.height;
         } break;
@@ -181,6 +181,7 @@ void canvas_setPixel(canvas_t *canvas, Vector2 pixel, Color color){
 }
 
 void canvas_setToImage(canvas_t *canvas, Image image){
+    // FIXME: using canvas->buffer might have unwanted implications on free.
     diff_t diff = {.type=IMAGE_DIFF, .before.image=canvas->buffer, .after.image=ImageCopy(image), .action_id=0}; // TODO: make images part of action_counter
     recorder_record(&canvas->rec, diff);
     __canvas_queue_diff(canvas, diff, DIRECTION_FORWARD);

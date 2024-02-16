@@ -40,7 +40,7 @@ typedef unsigned long __deq_size_t;
     type *items; __deq_size_t capacity; __deq_size_t size; __deq_size_t tail;   \
 }
 
-#define deq_free(deq) (deq).size = 0
+#define deq_free(deq) {(deq).size = 0; free((deq).items);}
 
 #define deq_size(deq) (deq).size
 
