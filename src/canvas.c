@@ -35,7 +35,7 @@ static bool setTextureToImage(Texture2D *texture, Image *image);
 static void ImageResizeCanvasOwn(Image *image, int newWidth, int newHeight, int offsetX, int offsetY, Color fill);
 static void imageColorFlood(Image *image, Vector2 source_pixel, Color new_color);
 
-#define MAX_UNDO_STEPS 100
+#define MAX_UNDO_STEPS 10000
 
 typedef struct pixel_t {
     Vector2 pos;
