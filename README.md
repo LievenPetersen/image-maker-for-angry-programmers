@@ -3,7 +3,7 @@
 The idea is to provide a simple image making tool with relatively short loading times for slow potatoes.
 
 
-- uses raylib + raygui
+- uses raylib + raygui and tinyfiledialogs
 - runs on Linux (/Unix?) and Windows
 - all dependencies are included
 - **build**:

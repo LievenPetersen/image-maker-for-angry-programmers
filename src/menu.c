@@ -25,10 +25,13 @@
 #define RAYGUI_IMPLEMENTATION
 #include "external/raygui.h"
 
+#include "external/tinyfiledialogs/tinyfiledialogs.h"
+
 #ifndef DISABLE_CUSTOM_FONT
     #include "font.h"
     #define FONT_LEVELS 3
 #endif //DISABLE_CUSTOM_FONT
+
 
 
 static void toolToggleButton(const char *text, enum CURSOR_MODE *cursor, enum CURSOR_MODE tool, int iconId, int y_position, int h_padding, int total_width, int font_size){
@@ -274,6 +277,32 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     int min_y = options_y + item*(huebar_padding+ms->font_size);
     int save_button_height = ms->font_size/6*7; // slightly higher, so that parentheses fit in the box.
 
+    // TODO: clean up tech dept (screen height, height positioning)
+    int load_button_height = save_button_height;
+    int desired_load_button_y = GetScreenHeight() - menu_padding - 2*load_button_height - 2*huebar_padding - ms->font_size;
+    Rectangle load_rect = {menu_padding, MAX(min_y + ms->font_size + menu_padding, desired_load_button_y), menu_content_width, load_button_height};
+    if(GuiButton(load_rect, "load")){
+        char * new_file = tinyfd_openFileDialog("load image", ms->filename, 0, NULL, NULL, false);
+        if (new_file){
+            if (FileExists(new_file)){
+                // TODO: recording the old file name for undo would be handy
+                // TODO: undo has unwanted implications when overwriting an existing different file.
+                // TODO: new canvas would be cleaner here.
+                // FIXME: add method to swap out the old canvas for a new one or reset it's state
+                Image new_image = LoadImage(new_file);
+                if (IsImageReady(new_image)){
+                    canvas_setToImage(s->canvas, new_image);
+                    s->forceImageResize = true;
+                } else {
+                    printf("Error: failed to load image from '%s'\n", new_file);
+                }
+                UnloadImage(new_image); // free image in both cases
+            } else {
+                printf("Error: file '%s' does not exist!\n", new_file);
+            }
+        }
+    }
+
     // file name
     int desired_text_box_y = GetScreenHeight() - menu_padding - huebar_padding - ms->font_size - save_button_height;
     int name_width = menu_content_width;
@@ -301,6 +330,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     }
 
     // save button
+    // TODO: improve y calculation, by appending to previous entry?
     int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
     Rectangle save_rect = {menu_padding, MAX(min_y + ms->font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
     if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);

@@ -29,7 +29,7 @@ ifeq ($(TARGET), WEB)
 endif
 
 SRC_DIR = src
-SRCS = $(wildcard $(SRC_DIR)/*.c)
+SRCS = $(wildcard $(SRC_DIR)/*.c) $(SRC_DIR)/external/tinyfiledialogs/tinyfiledialogs.c
 
 OUTPUT_LIN = imfap
 OUTPUT_WIN = imfap.exe
@@ -44,7 +44,8 @@ endif
 
 LIBS = -lm
 ifeq ($(TARGET), Windows)
-	LIBS = -lopengl32 -lgdi32 -lwinmm
+	LIBS = -lopengl32 -lgdi32 -lwinmm -lcomdlg32 -lole32
+# lcomdlg32 and lol32 are for tinyfiledialogs
 else ifeq ($(TARGET), WEB)
 	LIBS =
 endif
