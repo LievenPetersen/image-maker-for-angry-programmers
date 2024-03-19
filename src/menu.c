@@ -191,6 +191,8 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
         if (!ms->isEditingHexField){
             bool valid_hex = true;
             for(int i = 0; i < 8; i++){
+                // to lower
+                if (ms->hex_field[i] >= 'a' && ms->hex_field[i] <= 'f') ms->hex_field[i] &= 0xDF; // set the 0x20 bit to 0, thus turning to uppercase.
                 bool is_hex = (ms->hex_field[i] <= '9' && ms->hex_field [i] >= '0') || (ms->hex_field[i] >= 'A' && ms->hex_field[i] <= 'F');
                 if (!is_hex){
                     printf("digit %d: disallowed char '%c' (%d) \n",i,  ms->hex_field[i], ms->hex_field[i]);
