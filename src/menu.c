@@ -164,15 +164,19 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     int color_picker_size = menu_content_width - huebar_width - huebar_padding;
 
     Vector3 color_picker_hsv = s->active_color.hsv;
+    float bar_alpha = s->active_color.rgba.a / 255.0;
     float bar_hue = color_picker_hsv.x; // The color panel should only affect saturation & value. Thus hue is buffered.
     GuiColorPanelHSV((Rectangle){menu_padding, color_picker_y, color_picker_size, color_picker_size}, "heyyyy", &color_picker_hsv);
-    GuiColorBarHue((Rectangle){menu_padding + color_picker_size + huebar_padding, color_picker_y, huebar_width, color_picker_size}, "oiii", &bar_hue);
+    GuiColorBarHue(  (Rectangle){menu_padding + color_picker_size + huebar_padding, color_picker_y, huebar_width, color_picker_size}, "oiii", &bar_hue);
+    GuiColorBarAlpha((Rectangle){menu_padding, color_picker_y + color_picker_size + huebar_padding, color_picker_size + huebar_padding + huebar_width, huebar_width}, "uiii", &bar_alpha);
     color_picker_hsv.x = bar_hue;
 
     // check if the color picker changed the color
     if (memcmp(&color_picker_hsv, &s->active_color.hsv, sizeof(color_picker_hsv)) != 0){
         setFromHSV(&s->active_color, color_picker_hsv);
     }
+    // set alpha value. Since it is not represented in HSV, we modify rgba directly, to avoid overriding the hsv value with a lossy rgb -> hsv conversion.
+    s->active_color.rgba.a = bar_alpha * 255;
 
 
     // hex code text box
@@ -181,7 +185,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
         sprintf(ms->hex_field, "%02X%02X%02X%02X", color.r, color.g, color.b, color.a);
     }
 
-    Rectangle hex_box = {menu_padding, color_picker_size + color_picker_y + huebar_padding, menu_content_width, ms->font_size};
+    Rectangle hex_box = {menu_padding, color_picker_size + color_picker_y + 2*huebar_padding + huebar_width, menu_content_width, ms->font_size};
     if(GuiTextBox(hex_box, ms->hex_field, 9, ms->isEditingHexField)){
         ms->isEditingHexField = !ms->isEditingHexField;
         if (!ms->isEditingHexField){
@@ -205,7 +209,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
         }
     }
 
-    int options_y = color_picker_size + color_picker_y + 2*huebar_padding + ms->font_size;
+    int options_y = color_picker_size + color_picker_y + 3*huebar_padding + huebar_width + ms->font_size;
     int item = 0;
 
     // undo / redo buttons
