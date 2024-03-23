@@ -43,7 +43,6 @@ static void toolToggleButton(const char *text, enum CURSOR_MODE *cursor, enum CU
     if (*cursor == tool){
         DrawRectangleRec(pipette_box, ColorAlpha(RED, 0.3));
     }
-    // TODO: icon should scale with font size.
     const int icon_height = 16;
     GuiDrawIcon(iconId, h_padding + total_width - font_size, y_position, roundf(font_size/(float)icon_height), WHITE);
 }
@@ -274,10 +273,13 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     item++;
 
     // lower menu
-    int min_y = options_y + item*(huebar_padding+ms->font_size);
+    const int lower_menu_items = 3;
+    const int lower_menu_item_size = ms->font_size + huebar_padding;
+    int min_lower_menu_y = options_y + item*(huebar_padding+ms->font_size);
+    int desired_lower_menu_y = menu_rect.height - menu_padding - lower_menu_items*ms->font_size - (lower_menu_items-1)*huebar_padding;
+    int lower_menu_y = MAX(min_lower_menu_y, desired_lower_menu_y);
 
-    int desired_load_button_y = menu_rect.height - menu_padding - 2*ms->font_size - 2*huebar_padding - ms->font_size;
-    Rectangle load_rect = {menu_padding, MAX(min_y, desired_load_button_y), menu_content_width, ms->font_size};
+    Rectangle load_rect = {menu_padding, lower_menu_y, menu_content_width, ms->font_size};
     if(GuiButton(load_rect, "load")){
         char * new_file = tinyfd_openFileDialog("load image", ms->filename, 0, NULL, NULL, false);
         if (new_file){
@@ -301,9 +303,8 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     }
 
     // file name
-    int desired_text_box_y = menu_rect.height - menu_padding - huebar_padding - 2*(ms->font_size);
     int name_width = menu_content_width;
-    int text_box_y = MAX(min_y + ms->font_size + huebar_padding, desired_text_box_y);
+    int text_box_y = lower_menu_y + lower_menu_item_size;
     if (ms->isEditingFileName){
         int needed_width = MeasureText(ms->filename, ms->font_size) + ms->font_size;
         name_width = MAX(name_width, needed_width);
@@ -328,9 +329,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     }
 
     // save button
-    // TODO: improve y calculation, by appending to previous entry?
-    int desired_save_button_y = menu_rect.height - menu_padding - ms->font_size;
-    int save_button_y = MAX(min_y + 2*(ms->font_size + huebar_padding), desired_save_button_y);
+    int save_button_y = lower_menu_y + 2*lower_menu_item_size;
     Rectangle save_rect = {menu_padding, save_button_y, menu_content_width, ms->font_size};
     if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);
     if(GuiButton(save_rect, "save")){
