@@ -160,7 +160,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
 
     // draw menu
     DrawRectangleRec(menu_rect, ColorAlpha(FAV_COLOR, 0.2));
-    DrawLine(menu_rect.width, 0, menu_rect.width, GetScreenHeight(), GRAY);
+    DrawLine(menu_rect.width, 0, menu_rect.width, menu_rect.height, GRAY);
 
     // color picker
     int color_picker_y = menu_padding;
@@ -275,12 +275,9 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
 
     // lower menu
     int min_y = options_y + item*(huebar_padding+ms->font_size);
-    int save_button_height = ms->font_size/6*7; // slightly higher, so that parentheses fit in the box.
 
-    // TODO: clean up tech dept (screen height, height positioning)
-    int load_button_height = save_button_height;
-    int desired_load_button_y = GetScreenHeight() - menu_padding - 2*load_button_height - 2*huebar_padding - ms->font_size;
-    Rectangle load_rect = {menu_padding, MAX(min_y + ms->font_size + menu_padding, desired_load_button_y), menu_content_width, load_button_height};
+    int desired_load_button_y = menu_rect.height - menu_padding - 2*ms->font_size - 2*huebar_padding - ms->font_size;
+    Rectangle load_rect = {menu_padding, MAX(min_y, desired_load_button_y), menu_content_width, ms->font_size};
     if(GuiButton(load_rect, "load")){
         char * new_file = tinyfd_openFileDialog("load image", ms->filename, 0, NULL, NULL, false);
         if (new_file){
@@ -304,16 +301,17 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     }
 
     // file name
-    int desired_text_box_y = GetScreenHeight() - menu_padding - huebar_padding - ms->font_size - save_button_height;
+    int desired_text_box_y = menu_rect.height - menu_padding - huebar_padding - 2*(ms->font_size);
     int name_width = menu_content_width;
+    int text_box_y = MAX(min_y + ms->font_size + huebar_padding, desired_text_box_y);
     if (ms->isEditingFileName){
         int needed_width = MeasureText(ms->filename, ms->font_size) + ms->font_size;
         name_width = MAX(name_width, needed_width);
-        name_width = MIN(name_width, GetScreenWidth() - 2*menu_padding);
+        name_width = MIN(name_width, GetScreenWidth() - 2*menu_padding); // TODO: calculate actual space if menu is on left side
 
-        DrawTextEx(ms->font, ".png .bmp .qoi .raw", (Vector2){menu_padding, MAX(min_y, desired_text_box_y) - 0.6*ms->font_size}, 0.6*ms->font_size, 1, STD_COLOR);
+        DrawTextEx(ms->font, ".png .bmp .qoi .raw", (Vector2){menu_padding, text_box_y - 0.6*ms->font_size}, 0.6*ms->font_size, 1, STD_COLOR);
     }
-    if(GuiTextBox((Rectangle){menu_padding, MAX(min_y, desired_text_box_y), name_width, ms->font_size}, ms->filename, MAX_FILENAME_SIZE, ms->isEditingFileName)){
+    if(GuiTextBox((Rectangle){menu_padding, text_box_y, name_width, ms->font_size}, ms->filename, MAX_FILENAME_SIZE, ms->isEditingFileName)){
         ms->isEditingFileName = !ms->isEditingFileName;
         // validate
         if (!ms->isEditingFileName){
@@ -331,8 +329,9 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
 
     // save button
     // TODO: improve y calculation, by appending to previous entry?
-    int desired_save_button_y = GetScreenHeight() - menu_padding - save_button_height;
-    Rectangle save_rect = {menu_padding, MAX(min_y + ms->font_size + menu_padding, desired_save_button_y), menu_content_width, save_button_height};
+    int desired_save_button_y = menu_rect.height - menu_padding - ms->font_size;
+    int save_button_y = MAX(min_y + 2*(ms->font_size + huebar_padding), desired_save_button_y);
+    Rectangle save_rect = {menu_padding, save_button_y, menu_content_width, ms->font_size};
     if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);
     if(GuiButton(save_rect, "save")){
         canvas_saveAsImage(s->canvas, ms->filename);
