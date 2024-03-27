@@ -194,8 +194,10 @@ void drawMenu(shared_state_t *s, menu_state_t *ms){
                 s->forceImageResize = true;
             }
         } else {
-            int new_width = GetMousePosition().x + ms->dragOffset.x;
-            if (GetMousePosition().x != ms->dragOrigin.x || GetMousePosition().y != ms->dragOrigin.y) ms->isClick = false;
+            int new_width = MIN(GetMousePosition().x + ms->dragOffset.x, GetScreenWidth());
+            if (GetMousePosition().x != ms->dragOrigin.x || GetMousePosition().y != ms->dragOrigin.y){
+                ms->isClick = false;
+            }
             s->forceImageResize = true;
             if (new_width < minimum_menu_width){
                 s->menu_rect.width = minimum_menu_width;
