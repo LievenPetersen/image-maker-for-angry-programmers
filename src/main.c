@@ -99,8 +99,9 @@ int main(int argc, char **argv){
         .cursor = CURSOR_DEFAULT,
         .showGrid = true,
         .forceImageResize = true,
-        .forceMenuResize = true,
+        .forceMenuReset = true,
         .forceWindowResize = true,
+        .menu_rect = (Rectangle){0, 0, 20*ms->font_size/3.0f, GetScreenHeight()},
     };
     shared_state_t *s = &state;
 
@@ -112,7 +113,6 @@ int main(int argc, char **argv){
     int scale = 0; // floored floating scale that should be used everywhere.
 
     Rectangle drawingBounds = {0};
-    Rectangle menu_rect = {0};
     Vector2 image_position = {0};
 
     // Track hsv + alpha instead of rgba,
@@ -122,19 +122,19 @@ int main(int argc, char **argv){
     while(!WindowShouldClose()){
         if (IsWindowResized() || s->forceWindowResize){
             s->forceWindowResize = false;
-            s->forceMenuResize = true;
+            s->forceMenuReset = true;
             s->forceImageResize = true;
         }
-        if (s->forceMenuResize){
-            s->forceMenuResize = false;
+        if (s->forceMenuReset){
+            s->forceMenuReset = false;
             s->forceImageResize = true;
 
             int menu_width = 20*ms->font_size/3; // allow font size to force a minimum width
-            menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
+            s->menu_rect = (Rectangle){0, 0, menu_width, GetScreenHeight()};
         }
         if (s->forceImageResize){
             s->forceImageResize = false;
-            drawingBounds = (Rectangle){menu_rect.width, 0, GetScreenWidth()-menu_rect.width, GetScreenHeight()};
+            drawingBounds = (Rectangle){s->menu_rect.width, 0, GetScreenWidth() - s->menu_rect.width, GetScreenHeight()};
             // TODO support images bigger than drawingBounds
             // Not sure if this code should stay here. On one hand it is convenient to be able to find the image easily. On the other hand it is jarring to resize and move the image.
             Vector2 canvas_size = canvas_getSize(s->canvas);
@@ -148,8 +148,9 @@ int main(int argc, char **argv){
         if (!ms->isEditingFileName){ // name field can overlap with the canvas
 
             Rectangle image_bounds = {image_position.x, image_position.y, canvas_getSize(s->canvas).x*scale, canvas_getSize(s->canvas).y*scale};
-            bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), menu_rect);
-            bool isHoveringImage = !isHoveringMenu && CheckCollisionPointRec(GetMousePosition(), image_bounds);
+            bool isHoveringMenu = CheckCollisionPointRec(GetMousePosition(), s->menu_rect);
+            bool isHoveringDragger = CheckCollisionPointRec(GetMousePosition(), s->dragger);
+            bool isHoveringImage = !isHoveringMenu && !isHoveringDragger && CheckCollisionPointRec(GetMousePosition(), image_bounds);
 
             // Detect start of pixel drawing mode
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && isHoveringImage){
@@ -199,8 +200,8 @@ int main(int argc, char **argv){
                         case KEY_Z: if(isCtrlDown) isShiftDown? (canvas_redo(s->canvas)? s->forceImageResize = true:false) : (canvas_undo(s->canvas)? s->forceImageResize=true:false); break;
                         case KEY_ESCAPE: s->cursor = CURSOR_DEFAULT; break;
                         case KEY_HOME: s->forceWindowResize = true; break; // this causes the canvas to be centered again.
-                        case KEY_KP_ADD: {ms->font_size += 1; s->forceMenuResize = true;} break;
-                        case KEY_KP_SUBTRACT: {ms->font_size -= 1; s->forceMenuResize = true;} break;
+                        case KEY_KP_ADD: {ms->font_size += 1;} break;
+                        case KEY_KP_SUBTRACT: {ms->font_size -= 1;} break;
                     }
                 }
 
@@ -260,7 +261,7 @@ int main(int argc, char **argv){
             DrawRectangleLines(floored_image_position.x-1, floored_image_position.y-1, canvas_getSize(s->canvas).x*scale+2, canvas_getSize(s->canvas).y*scale+2, GRID_COLOR);
         }
 
-        drawMenu(s, ms, menu_rect);
+        drawMenu(s, ms);
 
         EndDrawing();
     }

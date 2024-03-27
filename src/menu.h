@@ -46,11 +46,14 @@
 typedef struct shared_state_t{
     color_t active_color;
     canvas_t *canvas;
+    Rectangle menu_rect;
     enum CURSOR_MODE cursor;
+    Rectangle dragger;
     bool forceImageResize;
-    bool forceMenuResize;
+    bool forceMenuReset;
     bool forceWindowResize;
     bool showGrid;
+    bool isUsingMouse;
 }shared_state_t;
 
 typedef struct menu_state_t{
@@ -62,10 +65,15 @@ typedef struct menu_state_t{
     Font *fonts;
     Font font;
     #endif
+    Vector2 dragOffset;
+    Vector2 dragOrigin;
+    int originalMenuWidth;
+    bool isDragging;
+    bool isClick;
 }menu_state_t;
 
 menu_state_t initMenu(char *image_name);
-void drawMenu(shared_state_t *s, menu_state_t *mf, Rectangle menu_rect);
+void drawMenu(shared_state_t *s, menu_state_t *ms);
 void unloadMenu(menu_state_t *ms);
 
 // utils

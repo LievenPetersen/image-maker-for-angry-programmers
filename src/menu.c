@@ -138,7 +138,83 @@ menu_state_t initMenu(char *image_name){
     return menu_state;
 }
 
-void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
+void drawMenuDragger(Rectangle rect, bool isDragging){
+    GuiState state = STATE_NORMAL;
+    // FIXME: frankenstein combination of raygui and own global state
+    if (isDragging){
+        state = STATE_PRESSED;
+    } else if(!guiSliderDragging && CheckCollisionPointRec(GetMousePosition(), rect)){
+        state = STATE_FOCUSED;
+    }
+
+    Color color = GRAY;
+    if (state != STATE_NORMAL){
+        color = RED;
+    }
+    DrawRectangleLinesEx(rect, 1, color);
+    for (int x = 1; x <= 2; x++){
+        for (int y = 1; y <= 4; y++){
+            DrawCircle(rect.x + x * (rect.width/3), rect.y + y*(rect.height/5), 1, color);
+        }
+    }
+}
+
+void drawMenu(shared_state_t *s, menu_state_t *ms){
+    // menu dragger
+    int dragger_height = ms->font_size; // 30
+    int dragger_width = 2 * ms->font_size / 5; // 12
+    s->dragger = (Rectangle){s->menu_rect.width - dragger_width - 1, (s->menu_rect.height - dragger_height)/2, dragger_width, dragger_height};
+    // if menu is collapsed, present dragger at screen edge.
+    if (s->menu_rect.width == 0) s->dragger.x = 0;
+
+    drawMenuDragger(s->dragger, ms->isDragging);
+
+    int minimum_menu_width = ms->font_size * 180 / DEFAULT_FONT_SIZE;
+
+    // drag menu
+    // TODO: clean up dragging code
+    if (!guiSliderDragging && !ms->isDragging && IsMouseButtonDown(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(GetMousePosition(), s->dragger)){
+        ms->isDragging = true;
+        ms->isClick = true;
+        s->isUsingMouse = true;
+        guiSliderDragging = true;
+        ms->dragOrigin = GetMousePosition();
+        ms->dragOffset = (Vector2){s->menu_rect.width - GetMousePosition().x, s->menu_rect.height - GetMousePosition().y};
+        if (s->menu_rect.width >= minimum_menu_width){
+            ms->originalMenuWidth = s->menu_rect.width;
+        }
+    }
+    if (ms->isDragging){
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)){
+            ms->isDragging = false;
+            s->isUsingMouse = false;
+            guiSliderDragging = false;
+            if (ms->isClick){
+                s->menu_rect.width = s->menu_rect.width == 0 ? MAX(ms->originalMenuWidth, minimum_menu_width) : 0;
+                s->forceImageResize = true;
+            }
+        } else {
+            int new_width = GetMousePosition().x + ms->dragOffset.x;
+            if (GetMousePosition().x != ms->dragOrigin.x || GetMousePosition().y != ms->dragOrigin.y) ms->isClick = false;
+            s->forceImageResize = true;
+            if (new_width < minimum_menu_width){
+                s->menu_rect.width = minimum_menu_width;
+                if(new_width < 3*minimum_menu_width/4.0){
+                    s->menu_rect.width = 0;
+                }
+            } else {
+                s->menu_rect.width = new_width;
+            }
+        }
+    }
+
+    // don't draw if menu is hidden
+    if (s->menu_rect.width == 0) return;
+    // push out if menu size was increased, for example by increasing font_size
+    if (s->menu_rect.width < minimum_menu_width){
+        s->menu_rect.width = minimum_menu_width;
+        s->forceImageResize = true;
+    }
 
     // TODO: this only needs to happen if the font size was changed
     #ifndef DISABLE_CUSTOM_FONT
@@ -152,14 +228,14 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     GuiSetStyle(DEFAULT, TEXT_SIZE, ms->font_size);
 
     // utilities for menu layout
-    int menu_padding = menu_rect.width / 10;
-    int menu_content_width = menu_rect.width - 2*menu_padding;
-    int huebar_width = menu_rect.width*2/25;
+    int menu_padding = s->menu_rect.width / 10;
+    int menu_content_width = s->menu_rect.width - 2*menu_padding;
+    int huebar_width = s->menu_rect.width*2/25;
     int huebar_padding = huebar_width/2;
 
     // draw menu
-    DrawRectangleRec(menu_rect, ColorAlpha(FAV_COLOR, 0.2));
-    DrawLine(menu_rect.width, 0, menu_rect.width, menu_rect.height, GRAY);
+    DrawRectangleRec(s->menu_rect, ColorAlpha(FAV_COLOR, 0.2));
+    DrawLine(s->menu_rect.width, 0, s->menu_rect.width, s->menu_rect.height, GRAY);
 
     // color picker
     int color_picker_y = menu_padding;
@@ -216,7 +292,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     int options_y = color_picker_size + color_picker_y + 3*huebar_padding + huebar_width + ms->font_size;
     int item = 0;
 
-    // undo / redo buttons
+    // undo & redo buttons
     Rectangle undo_box = {menu_padding, options_y + item*(huebar_padding+ms->font_size), 0.5*menu_content_width, ms->font_size};
     Rectangle redo_box = {menu_padding + 0.5*menu_content_width, options_y + (item++)*(huebar_padding+ms->font_size), 0.5*menu_content_width, ms->font_size};
     if(GuiButton(undo_box, "#130#")){
@@ -276,7 +352,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     const int lower_menu_items = 3;
     const int lower_menu_item_size = ms->font_size + huebar_padding;
     int min_lower_menu_y = options_y + item*(huebar_padding+ms->font_size);
-    int desired_lower_menu_y = menu_rect.height - menu_padding - lower_menu_items*ms->font_size - (lower_menu_items-1)*huebar_padding;
+    int desired_lower_menu_y = s->menu_rect.height - menu_padding - lower_menu_items*ms->font_size - (lower_menu_items-1)*huebar_padding;
     int lower_menu_y = MAX(min_lower_menu_y, desired_lower_menu_y);
 
     Rectangle load_rect = {menu_padding, lower_menu_y, menu_content_width, ms->font_size};
@@ -331,7 +407,7 @@ void drawMenu(shared_state_t *s, menu_state_t *ms, Rectangle menu_rect){
     // save button
     int save_button_y = lower_menu_y + 2*lower_menu_item_size;
     Rectangle save_rect = {menu_padding, save_button_y, menu_content_width, ms->font_size};
-    if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);
+    if (CheckCollisionPointRec(GetMousePosition(), save_rect)) DrawTextEx(ms->font, "ctrl+s", (Vector2){s->menu_rect.width, save_rect.y + (save_rect.height - ms->font_size)/2}, ms->font_size, 1, WHITE);
     if(GuiButton(save_rect, "save")){
         canvas_saveAsImage(s->canvas, ms->filename);
     }
