@@ -42,6 +42,7 @@ Vector2 Vector2FloorPositive(Vector2 vec){
 
 
 int main(int argc, char **argv){
+    SetTraceLogLevel(LOG_WARNING); // Logs could also be redirected with a custom callback function.
 
     // draw loading screen
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
